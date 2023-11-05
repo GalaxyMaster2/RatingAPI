@@ -10,10 +10,11 @@ namespace RatingAPI.Controllers
         private const int BatchSize = 4;
         private DataProcessing dataProcessing = new DataProcessing();
 
-        public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx");
+        private static object inferenceSessionLock = new();
+        private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx");
 
         // Replace with this to use gpu. Requires Microsoft.ML.OnnxRuntime.Gpu nuget
-        //public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
+        //private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
 
         public string GetDiffLabel(int difficulty)
         {
@@ -77,23 +78,26 @@ namespace RatingAPI.Controllers
                 NamedOnnxValue.CreateFromTensor("input_1", new DenseTensor<float>(flatInput, new int[] { input.Length, 32, 49 })),
             };
 
-            using var output = inferenceSession.Run(modelInput, new[] { "time_distributed_2" });
-
             var outputs = new float[input.Length, 8];
 
-            var flatOutput = (output.First().Value as IEnumerable<float>).ToArray();
-
-            System.Buffer.BlockCopy(flatOutput, 0, outputs, 0, outputs.Length * sizeof(float));
+            lock (inferenceSessionLock)
+            {
+                using (var output = inferenceSession.Run(modelInput, new[] { "time_distributed_2" }))
+                {
+                    var flatOutput = (output.First().Value as IEnumerable<float>).ToArray();
+                    System.Buffer.BlockCopy(flatOutput, 0, outputs, 0, outputs.Length * sizeof(float));
+                }
+            }
 
             var listOutputs = new List<float[]>();
             for(int i = 0; i < input.Length; ++i)
             {
-                var _output = new float[8];
+                var output = new float[8];
                 for (int j = 0; j < 8; ++j)
                 {
-                    _output[j] = outputs[i, j];
+                    output[j] = outputs[i, j];
                 }
-                listOutputs.Add(_output);
+                listOutputs.Add(output);
             }
             return listOutputs;
         }
