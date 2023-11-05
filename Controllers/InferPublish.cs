@@ -10,7 +10,10 @@ namespace RatingAPI.Controllers
         private const int BatchSize = 4;
         private DataProcessing dataProcessing = new DataProcessing();
 
-        public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
+        public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx");
+
+        // Replace with this to use gpu. Requires Microsoft.ML.OnnxRuntime.Gpu nuget
+        //public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
 
         public string GetDiffLabel(int difficulty)
         {
