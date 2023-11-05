@@ -156,8 +156,8 @@ namespace RatingAPI.Controllers
             foreach (var note in mapNotes)
             {
                 double noteTime = note.Item1;
-                int[] noteInfo = note.Item2.Split().Select(s => int.Parse(s)).ToArray();
-                string type = noteInfo[^1].ToString(); // Assuming the last element of noteInfo can be converted to a string
+                int[] noteInfo = note.Item2.Select(s => s-'0').ToArray();
+                int type = noteInfo.Last();
 
                 double deltaToZero = noteTime - prevZeroNoteTime;
                 double deltaToOne = noteTime - prevOneNoteTime;
@@ -167,14 +167,14 @@ namespace RatingAPI.Controllers
                     Console.WriteLine($"{deltaToZero} {deltaToOne}");
                 }
 
-                if (type == "0")
+                if (type == 0)
                 {
                     prevZeroNoteTime = noteTime;
                     List<double> noteProcessed = PreprocessNote(deltaToZero, deltaToOne, noteInfo, njs, timeScale);
                     notes.Add(noteProcessed);
                     noteTimes.Add(noteTime);
                 }
-                if (type == "1")
+                if (type == 1)
                 {
                     prevOneNoteTime = noteTime;
                     List<double> noteProcessed = PreprocessNote(deltaToOne, deltaToZero, noteInfo, njs, timeScale);

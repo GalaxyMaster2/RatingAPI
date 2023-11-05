@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace RatingAPI.Controllers
 {
@@ -14,7 +15,10 @@ namespace RatingAPI.Controllers
         [HttpGet("~/ppai/{hash}/{diff}/{mode}")]
         public ActionResult<double> Get(string hash, int diff, string mode)
         {
-            return new InferPublish().GetBlRatings(hash, mode, diff, 1);
+            Stopwatch sw = Stopwatch.StartNew();
+            var res = new InferPublish().GetBlRatings(hash, mode, diff, 1);
+            Console.WriteLine(sw.ElapsedMilliseconds);
+            return res;
         }
     }
 }

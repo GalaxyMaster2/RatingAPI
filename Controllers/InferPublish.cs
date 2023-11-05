@@ -1,37 +1,16 @@
-﻿using System;
-using Tensorflow.NumPy;
-using Tensorflow;
-using Tensorflow.Keras.Engine;
-using static Tensorflow.Binding;
+﻿using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using System;
 
 
 namespace RatingAPI.Controllers
 {
     public class InferPublish
     {
-        private const int BatchSize = 16;
-        private Sequential model;
-        private DataProcessing dataProcessing;
-        private static TF_DataType modelDataType = TF_DataType.TF_FLOAT;
+        private const int BatchSize = 4;
+        private DataProcessing dataProcessing = new DataProcessing();
 
-        public InferPublish()
-        {
-            // Disable GPU usage by setting an invalid GPU device id.
-            Environment.SetEnvironmentVariable("CUDA_VISIBLE_DEVICES", "-1");
-
-            // Load the model.
-            model = LoadModel("D:\\path_to_my_model");
-            dataProcessing = new DataProcessing();
-        }
-
-        private Sequential LoadModel(string modelName)
-        {
-            // Initialize a new instance of the TensorFlow graph.
-            tf.compat.v1.disable_eager_execution();
-
-            // Load the model. Make sure that the path is correct for the .NET environment.
-            return (Sequential)KerasApi.keras.models.load_model(modelName);
-        }
+        public static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
 
         public string GetDiffLabel(int difficulty)
         {
@@ -87,16 +66,33 @@ namespace RatingAPI.Controllers
             return totalScore / maxScore;
         }
 
-        public NDArray PredictOnBatch(NDArray batch)
+        public List<float[]> Predict(List<double[]>[] input)
         {
-            // Convert batch to Tensor
-            Tensor tensor = tf.convert_to_tensor(batch, dtype: modelDataType);
+            float[] flatInput = input.SelectMany(v => v.SelectMany(v => v.Select(v => (float)v))).ToArray();
+            var modelInput = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor("input_1", new DenseTensor<float>(flatInput, new int[] { input.Length, 32, 49 })),
+            };
 
-            // Predict
-            var predictions = model.predict(new Tensor[] { tensor });
+            using var output = inferenceSession.Run(modelInput, new[] { "time_distributed_2" });
 
-            // Convert predictions to NDArray if necessary
-            return predictions.numpy();
+            var outputs = new float[input.Length, 8];
+
+            var flatOutput = (output.First().Value as IEnumerable<float>).ToArray();
+
+            System.Buffer.BlockCopy(flatOutput, 0, outputs, 0, outputs.Length * sizeof(float));
+
+            var listOutputs = new List<float[]>();
+            for(int i = 0; i < input.Length; ++i)
+            {
+                var _output = new float[8];
+                for (int j = 0; j < 8; ++j)
+                {
+                    _output[j] = outputs[i, j];
+                }
+                listOutputs.Add(_output);
+            }
+            return listOutputs;
         }
 
         public (List<float>, List<double>, int) PredictHitsForMap(
@@ -112,7 +108,7 @@ namespace RatingAPI.Controllers
                 return (new List<float>(), new List<double>(), freePoints);
             }
 
-            var predictionsArraysAcc = new List<NDArray>();
+            var predictionsArraysAcc = new List<float[]>();
 
             for (int i = 0; i < segments.Count; i += BatchSize)
             {
@@ -121,7 +117,7 @@ namespace RatingAPI.Controllers
                 {
                     break;
                 }
-                var accPrediction = PredictOnBatch(new NDArray(batch));
+                var accPrediction = Predict(batch);
                 predictionsArraysAcc.AddRange(accPrediction);
             }
 
@@ -132,9 +128,9 @@ namespace RatingAPI.Controllers
                 var batchPred = predictionsArraysAcc[i];
                 var batchInp = segments[i];
 
-                for (ulong j = 0; j < batchPred.size; j++)
+                for (int j = 0; j < batchPred.Length; j++)
                 {
-                    var pred = batchPred[j].ToArray<float>();
+                    var pred = batchPred[j];
                     var inp = batchInp.Skip(DataProcessing.preSegmentSize).Take(batchInp.Count - DataProcessing.preSegmentSize - DataProcessing.preSegmentSize).ToArray()[0];
 
                     if (inp.Sum() == 0.0)
@@ -146,7 +142,7 @@ namespace RatingAPI.Controllers
                         continue;
                     }
 
-                    accs.Add(Math.Max(0, pred[0]));
+                    accs.Add(Math.Max(0, pred));
                 }
             }
 
