@@ -12,8 +12,8 @@ namespace RatingAPI.Controllers
             _logger = logger;
         }
 
-        [HttpGet("~/ppai/{hash}/{diff}/{mode}")]
-        public ActionResult<double> Get(string hash, int diff, string mode)
+        [HttpGet("~/ppai/{hash}/{mode}/{diff}")]
+        public ActionResult<double> Get(string hash, string mode, int diff)
         {
             Stopwatch sw = Stopwatch.StartNew();
             var res = new InferPublish().GetBlRatings(hash, mode, diff, 1);
