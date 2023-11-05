@@ -472,7 +472,7 @@ namespace RatingAPI.Controllers
             return GetAccForMultiplierScale(multiplier);
         }
 
-        public double GetBlRatings(string hash, string characteristic, double diff, double timescale)
+        public double GetAIAcc(string hash, string characteristic, double diff, double timescale)
         {
             var (accs, noteTimes, freePoints) = PredictHitsForMap(hash.ToLower(), characteristic, (int)diff, false, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
