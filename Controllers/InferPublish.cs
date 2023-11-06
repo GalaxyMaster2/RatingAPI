@@ -1,5 +1,6 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using Parser.Map;
 using System;
 
 
@@ -103,14 +104,9 @@ namespace RatingAPI.Controllers
             return listOutputs;
         }
 
-        public (List<float>, List<double>, int) PredictHitsForMap(
-        string hash,
-        string characteristic,
-        int difficulty,
-        bool excludeDots,
-        double timeScale = 1.0)
+        public (List<float>, List<double>, int) PredictHitsForMap(DifficultySet difficulty, double timescale = 1)
         {
-            var (segments, songName, noteTimes, freePoints) = dataProcessing.PreprocessMap(hash, characteristic, difficulty, timeScale);
+            var (segments, songName, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, timescale);
             if (segments.Count == 0)
             {
                 return (new List<float>(), new List<double>(), freePoints);
@@ -142,10 +138,6 @@ namespace RatingAPI.Controllers
                     var inp = batchInp.Skip(DataProcessing.preSegmentSize).Take(batchInp.Count - DataProcessing.preSegmentSize - DataProcessing.preSegmentSize).ToArray()[0];
 
                     if (inp.Sum() == 0.0)
-                    {
-                        continue;
-                    }
-                    if (excludeDots && (inp[4 * 3 + 8] > 0 || inp[4 * 3 + 10 + 4 * 3 + 8] > 0))
                     {
                         continue;
                     }
@@ -472,9 +464,9 @@ namespace RatingAPI.Controllers
             return GetAccForMultiplierScale(multiplier);
         }
 
-        public double GetAIAcc(string hash, string characteristic, double diff, double timescale)
+        public double GetAIAcc(DifficultySet difficulty, double timescale)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(hash.ToLower(), characteristic, (int)diff, false, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
             double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
             AIacc = adjustedAIacc;

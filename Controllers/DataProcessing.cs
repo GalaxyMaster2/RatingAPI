@@ -11,13 +11,15 @@ using System.Net;
 using System.Net.Http;
 
 using Newtonsoft.Json.Linq;
+using beatleader_parser;
+using beatleader_analyzer;
+using Parser.Map;
+using Parser.Map.Difficulty.V3.Grid;
 
 namespace RatingAPI.Controllers
 {
     public class DataProcessing
     {
-        public static string maps_dir = "D:\\maps";
-
         public static int preSegmentSize = 12;
         public static int postSegmentSize = 12;
         public static int predictionSize = 8;
@@ -64,30 +66,17 @@ namespace RatingAPI.Controllers
         }
 
         // Method to get map notes from json
-        public static List<Tuple<double, string>> GetMapNotesFromJson(JObject mapJson, double bpmTimeScale)
+        public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultySet beatmap)
         {
-            List<Tuple<double, string>> mapNotes;
-            if (mapJson.ContainsKey("version") && mapJson["version"].ToString().Split('.')[0] == "3")
-            {
-                mapNotes = mapJson["colorNotes"]
-                    .Where(n => (int)n["c"] == 1 || (int)n["c"] == 0 && (int)n["x"] < 1000 && (int)n["x"] >= 0 && (int)n["y"] < 1000 && (int)n["y"] >= 0)
+            List<Tuple<double, string>> mapNotes = beatmap.Data.colorNotes
+                    .Where(n => n.x < 1000 && n.x >= 0 && n.y < 1000 && n.y >= 0)
                     .Select(n => Tuple.Create(
-                        (double)n["b"] * bpmTimeScale,
-                        $"{n["x"]}{n["y"]}{GetNoteDirection((int)n["d"], (double)n["a"])}{(int)n["c"]}"
+                        (double)n.b * (60 / Parse.GetBeatmap().Info._beatsPerMinute),
+                        $"{n.x}{n.y}{GetNoteDirection(n.d, n.a)}{n.c}"
                     ))
                     .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
-                    .ToList();
-            } else
-            {
-                mapNotes = mapJson["_notes"]
-                    .Where(n => (int)n["_type"] == 1 || (int)n["_type"] == 0 && (int)n["_lineIndex"] < 1000 && (int)n["_lineIndex"] >= 0 && (int)n["_lineLayer"] < 1000 && (int)n["_lineLayer"] >= 0)
-                    .Select(n => Tuple.Create(
-                        (double)n["_time"] * bpmTimeScale,
-                        $"{n["_lineIndex"]}{n["_lineLayer"]}{n["_cutDirection"]}{n["_type"]}"
-                    ))
-                    .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
-                    .ToList();
-            }
+                    .ToList(); ;
+            
             return mapNotes;
         }
 
@@ -147,8 +136,8 @@ namespace RatingAPI.Controllers
 
         public static Tuple<List<double[]>, List<double>> PreprocessMapNotes(List<Tuple<double, string>> mapNotes, double njs, double timeScale)
         {
-            List<List<double>> notes = new List<List<double>>();
-            List<double> noteTimes = new List<double>();
+            List<List<double>> notes = new();
+            List<double> noteTimes = new();
 
             double prevZeroNoteTime = 0;
             double prevOneNoteTime = 0;
@@ -230,23 +219,16 @@ namespace RatingAPI.Controllers
             return segments;
         }
 
-        public int GetFreePointsForMap(JObject mapJson)
+        public int GetFreePointsForMap(DifficultySet beatmap)
         {
-            if (mapJson.ContainsKey("version") &&
-                mapJson.Value<string>("version").Split('.')[0] == "3" &&
-                mapJson.ContainsKey("burstSliders"))
+            if (beatmap.Data.burstSliders.Count == 0) return 0;
+
+            int segmentCount = 0;
+            foreach (var burstSlider in beatmap.Data.burstSliders)
             {
-                var burstSliders = mapJson.Value<JArray>("burstSliders");
-                int segmentCount = 0;
-                foreach (var burstSlider in burstSliders)
-                {
-                    segmentCount += burstSlider.Value<int>("sc");
-                }
-                return segmentCount * 20 * 8;
-            } else
-            {
-                return 0;
+                segmentCount += burstSlider.sc;
             }
+            return segmentCount * 20 * 8;
         }
 
         public JObject V3_3_0_to_V3(JObject V3_0_0mapData)
@@ -303,129 +285,30 @@ namespace RatingAPI.Controllers
             return newMapData;
         }
 
-        public (double? njs, List<Tuple<double, string>> mapNotes, string songName, int freePoints) GetMapData(string hash, string characteristic, int difficulty)
+        public (double? njs, List<Tuple<double, string>> mapNotes, string songName, int freePoints) GetMapData(DifficultySet difficulty)
         {
-            if (characteristic == null)
-            {
-                characteristic = "Standard";
-            }
+            double? njs = Parse.GetBeatmap().Info._difficultyBeatmapSets.
+                FirstOrDefault(x => x._beatmapCharacteristicName == difficulty.Characteristic).
+                _difficultyBeatmaps.FirstOrDefault(x => x._difficulty == difficulty.Difficulty)._noteJumpMovementSpeed;
 
-            var mapInfoFiles = new List<string>();
-            mapInfoFiles.AddRange(Directory.GetFiles($"{maps_dir}/{hash}", "Info.dat", SearchOption.TopDirectoryOnly));
-            mapInfoFiles.AddRange(Directory.GetFiles($"{maps_dir}/{hash}", "info.dat", SearchOption.TopDirectoryOnly));
-            string mapInfoFile = mapInfoFiles.First();
-            double? njs = null;
             List<Tuple<double, string>> mapNotes = null;
-            string songName = null;
+            string songName = Parse.GetBeatmap().Info._songName;
             int freePoints = 0;
-
-            string fileContent = File.ReadAllText(mapInfoFile);
-            JObject mapInfo = JObject.Parse(fileContent);
-            double bpm = mapInfo.Value<double>("_beatsPerMinute");
-            double bpmTimeScale = 60 / bpm;
-            songName = mapInfo.Value<string>("_songName");
-
-            foreach (var beatmapSet in mapInfo["_difficultyBeatmapSets"])
-            {
-                if (beatmapSet["_beatmapCharacteristicName"].ToString().Replace(" ", "") != characteristic)
-                {
-                    continue;
-                }
-
-                foreach (var beatmap in beatmapSet["_difficultyBeatmaps"])
-                {
-                    if (beatmap.Value<int>("_difficultyRank") == difficulty)
-                    {
-                        njs = beatmap.Value<double>("_noteJumpMovementSpeed");
-                        string mapFileName = beatmap.Value<string>("_beatmapFilename");
-                        string mapFilePath = mapInfoFile.Replace("Info.dat", mapFileName).Replace("info.dat", mapFileName);
-                        string mapFileContent = File.ReadAllText(mapFilePath);
-                        JObject mapJson = JObject.Parse(mapFileContent);
-                        if (mapJson.ContainsKey("version") && Version.Parse(mapJson.Value<string>("version")) > Version.Parse("3.2.0"))
-                        {
-                            mapJson = V3_3_0_to_V3(mapJson);
-                        }
-                        mapNotes = GetMapNotesFromJson(mapJson, bpmTimeScale);
-                        freePoints = GetFreePointsForMap(mapJson);
-                    }
-                }
-            }
-
+            mapNotes = GetMapNotesFromJson(difficulty);
+            freePoints = GetFreePointsForMap(difficulty);
             return (njs, mapNotes, songName, freePoints);
         }
 
-        public void DownloadMap(string hash)
+        public (List<List<double[]>> segments, string songName, List<double> noteTimes, int freePoints) PreprocessMap(DifficultySet difficulty, double timescale)
         {
-            string mapDir = Path.Combine(maps_dir, hash);
-
-            if (Directory.Exists(mapDir))
-            {
-                return;
-            }
-
-            string beatsaverUrl = $"https://beatsaver.com/api/maps/hash/{hash}";
-            using (var httpClient = new HttpClient())
-            {
-                var response = httpClient.GetStringAsync(beatsaverUrl).Result;
-                dynamic beatsaverData = JsonConvert.DeserializeObject(response);
-                string downloadURL = string.Empty;
-
-                foreach (var version in beatsaverData.versions)
-                {
-                    if (version.hash.ToString().ToLower() == hash.ToLower())
-                    {
-                        downloadURL = version.downloadURL;
-                        break;
-                    }
-                }
-
-                if (string.IsNullOrEmpty(downloadURL))
-                {
-                    throw new Exception("Map download URL not found.");
-                }
-
-                using (var client = new WebClient())
-                {
-                    client.Headers.Add("User-Agent", "Mozilla/5.0 (compatible; BeatSaverDownloader/1.0)");
-                    byte[] data = client.DownloadData(downloadURL);
-
-                    using (var zipStream = new MemoryStream(data))
-                    using (var zipArchive = new ZipArchive(zipStream))
-                    {
-                        Directory.CreateDirectory(mapDir);
-                        zipArchive.ExtractToDirectory(mapDir);
-
-                        string[] extractedFiles = Directory.GetFiles(mapDir);
-                        foreach (string extractedFile in extractedFiles)
-                        {
-                            if (!extractedFile.EndsWith(".dat"))
-                            {
-                                try
-                                {
-                                    File.Delete(extractedFile);
-                                } catch
-                                {
-                                    // Handle exceptions if required or continue
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        public (List<List<double[]>> segments, string songName, List<double> noteTimes, int freePoints) PreprocessMap(string hash, string characteristic, int difficulty, double timeScale)
-        {
-            DownloadMap(hash);
-
             var emptyResponse = (new List<List<double[]>>(), "", new List<double>(), 0);
-            var (njs, mapNotes, songName, freePoints) = GetMapData(hash, characteristic, difficulty);
+            var (njs, mapNotes, songName, freePoints) = GetMapData(difficulty);
             if (!njs.HasValue || mapNotes == null)
             {
                 return emptyResponse;
             }
 
-            var (notes, noteTimes) = PreprocessMapNotes(mapNotes, njs.Value, timeScale);
+            var (notes, noteTimes) = PreprocessMapNotes(mapNotes, njs.Value, timescale);
             List<List<double[]>> segments = CreateSegments(notes);
             return (segments, songName, noteTimes, freePoints);
         }
