@@ -5,7 +5,7 @@ namespace RatingAPI.Controllers
 {
     public class Downloader
     {
-        public string maps_dir = "D:\\maps";
+        public string maps_dir = "C:\\maps";
 
         public string Map(string hash)
         {
@@ -13,13 +13,13 @@ namespace RatingAPI.Controllers
 
             if (Directory.Exists(mapDir))
             {
-                return "";
+                return mapDir;
             }
 
             string beatsaverUrl = $"https://beatsaver.com/api/maps/hash/{hash}";
             using var httpClient = new HttpClient();
-            var response = httpClient.GetStringAsync(beatsaverUrl).Result;
-            dynamic beatsaverData = JsonConvert.DeserializeObject(response);
+            var response = httpClient.GetStringAsync(beatsaverUrl).Result ?? throw new Exception("Error during API request");
+            dynamic? beatsaverData = JsonConvert.DeserializeObject(response) ?? throw new Exception("Error during deserialization");
             string downloadURL = string.Empty;
 
             foreach (var version in beatsaverData.versions)

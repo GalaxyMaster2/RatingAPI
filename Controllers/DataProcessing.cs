@@ -66,12 +66,12 @@ namespace RatingAPI.Controllers
         }
 
         // Method to get map notes from json
-        public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultySet beatmap)
+        public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultySet beatmap, double bpm)
         {
             List<Tuple<double, string>> mapNotes = beatmap.Data.colorNotes
                     .Where(n => n.x < 1000 && n.x >= 0 && n.y < 1000 && n.y >= 0)
                     .Select(n => Tuple.Create(
-                        (double)n.b * (60 / Parse.GetBeatmap().Info._beatsPerMinute),
+                        (double)n.b * (60 / bpm),
                         $"{n.x}{n.y}{GetNoteDirection(n.d, n.a)}{n.c}"
                     ))
                     .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
@@ -231,32 +231,25 @@ namespace RatingAPI.Controllers
             return segmentCount * 20 * 8;
         }
 
-        public (double? njs, List<Tuple<double, string>> mapNotes, string songName, int freePoints) GetMapData(DifficultySet difficulty)
+        public (List<Tuple<double, string>> mapNotes, int freePoints) GetMapData(DifficultySet difficulty, double bpm)
         {
-            double? njs = Parse.GetBeatmap().Info._difficultyBeatmapSets.
-                FirstOrDefault(x => x._beatmapCharacteristicName == difficulty.Characteristic).
-                _difficultyBeatmaps.FirstOrDefault(x => x._difficulty == difficulty.Difficulty)._noteJumpMovementSpeed;
-
-            List<Tuple<double, string>> mapNotes = null;
-            string songName = Parse.GetBeatmap().Info._songName;
-            int freePoints = 0;
-            mapNotes = GetMapNotesFromJson(difficulty);
-            freePoints = GetFreePointsForMap(difficulty);
-            return (njs, mapNotes, songName, freePoints);
+            var mapNotes = GetMapNotesFromJson(difficulty, bpm);
+            var freePoints = GetFreePointsForMap(difficulty);
+            return (mapNotes, freePoints);
         }
 
-        public (List<List<double[]>> segments, string songName, List<double> noteTimes, int freePoints) PreprocessMap(DifficultySet difficulty, double timescale)
+        public (List<List<double[]>> segments, List<double> noteTimes, int freePoints) PreprocessMap(DifficultySet difficulty, double bpm, double njs, double timescale)
         {
-            var emptyResponse = (new List<List<double[]>>(), "", new List<double>(), 0);
-            var (njs, mapNotes, songName, freePoints) = GetMapData(difficulty);
-            if (!njs.HasValue || mapNotes == null)
+            var emptyResponse = (new List<List<double[]>>(), new List<double>(), 0);
+            var (mapNotes, freePoints) = GetMapData(difficulty, bpm);
+            if (mapNotes == null)
             {
                 return emptyResponse;
             }
 
-            var (notes, noteTimes) = PreprocessMapNotes(mapNotes, njs.Value, timescale);
+            var (notes, noteTimes) = PreprocessMapNotes(mapNotes, njs, timescale);
             List<List<double[]>> segments = CreateSegments(notes);
-            return (segments, songName, noteTimes, freePoints);
+            return (segments, noteTimes, freePoints);
         }
     }
 }
