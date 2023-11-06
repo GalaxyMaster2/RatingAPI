@@ -2,7 +2,7 @@
 {
     public class AccRating
     {
-        public static List<(double, double)> PointList { get; set; } = new()
+        public List<(double, double)> PointList { get; set; } = new()
         {
                 (1.0, 7.424),
                 (0.999, 6.241),
@@ -57,7 +57,7 @@
             return difficulty_to_acc;
         }
 
-        public static float Curve(double acc)
+        public float Curve(double acc)
         {
             int i = 0;
             for (; i < PointList.Count; i++)
