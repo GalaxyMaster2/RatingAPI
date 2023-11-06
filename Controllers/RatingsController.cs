@@ -70,6 +70,8 @@ namespace RatingAPI.Controllers
         private readonly Analyze analyzer = new();
         private readonly Parse parser = new();
 
+        private readonly InferPublish ai = new();
+
         public RatingsController(ILogger<RatingsController> logger)
         {
             _logger = logger;
@@ -94,6 +96,24 @@ namespace RatingAPI.Controllers
             return results;
         }
 
+        [HttpGet("~/json/{hash}/{mode}/{diff}/full/time-scale/{scale}")]
+        public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
+        {
+            var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
+            if (mapset == null) return null;
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
+            if (beatmapSets == null) return null;
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == FormattingUtils.GetDiffLabel(diff));
+            if (data == null) return null;
+            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == FormattingUtils.GetDiffLabel(diff));
+            if (map == null) return null;
+
+            return new Dictionary<string, object>
+            {
+                ["notes"] = ai.PredictHitsForMapNotes(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+            };
+        }
+
         public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
             var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
             if (mapset == null) return new();
@@ -105,7 +125,7 @@ namespace RatingAPI.Controllers
             if (map == null) return new();
             var ratings = analyzer.GetRating(map.Data, mode, diff, mapset.Info._beatsPerMinute, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
-            var predictedAcc = new InferPublish().GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+            var predictedAcc = ai.GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,

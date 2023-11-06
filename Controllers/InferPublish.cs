@@ -9,10 +9,13 @@ namespace RatingAPI.Controllers
     {
         private const int BatchSize = 4;
         private const int NumThreads = 4;
+        private const int preSegmentSize = 12;
+        private const int postSegmentSize = 12;
         private DataProcessing dataProcessing = new DataProcessing();
 
         private static object inferenceSessionLock = new();
-        private static InferenceSession inferenceSession = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_acc.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
+        private static InferenceSession inferenceSessionAcc = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_acc.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
+        private static InferenceSession inferenceSessionSpeed = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_speed.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
 
         // Replace with this to use gpu. Requires Microsoft.ML.OnnxRuntime.Gpu nuget
         //private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
@@ -58,7 +61,7 @@ namespace RatingAPI.Controllers
             return totalScore / maxScore;
         }
 
-        public List<float[]> Predict(List<double[]>[] input)
+        public List<float[]> Predict(List<double[]>[] input, bool speed = false)
         {
             float[] flatInput = input.SelectMany(v => v.SelectMany(v => v.Select(v => (float)v))).ToArray();
             var modelInput = new List<NamedOnnxValue>
@@ -70,7 +73,7 @@ namespace RatingAPI.Controllers
 
             lock (inferenceSessionLock)
             {
-                using (var output = inferenceSession.Run(modelInput, new[] { "time_distributed_2" }))
+                using (var output = (speed ? inferenceSessionSpeed : inferenceSessionAcc).Run(modelInput, new[] { "time_distributed_2" }))
                 {
                     var flatOutput = (output.First().Value as IEnumerable<float>).ToArray();
                     System.Buffer.BlockCopy(flatOutput, 0, outputs, 0, outputs.Length * sizeof(float));
@@ -78,7 +81,7 @@ namespace RatingAPI.Controllers
             }
 
             var listOutputs = new List<float[]>();
-            for(int i = 0; i < input.Length; ++i)
+            for (int i = 0; i < input.Length; ++i)
             {
                 var output = new float[8];
                 for (int j = 0; j < 8; ++j)
@@ -133,6 +136,61 @@ namespace RatingAPI.Controllers
             }
 
             return (accs, noteTimes, freePoints);
+        }
+
+        public Dictionary<string, object>? PredictHitsForMapNotes(DifficultySet difficulty, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
+        {
+            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, bpm, njs, timescale);
+            if (segments.Count == 0)
+                return null;
+
+            int batchSize = 16;
+
+            List<float[]> predictionsAcc = new List<float[]>();
+            List<float[]> predictionsSpeed = new List<float[]>();
+
+            for (int i = 0; i < segments.Count; i += batchSize)
+            {
+                var batch = segments.GetRange(i, Math.Min(batchSize, segments.Count - i)).ToArray();
+                if (batch.Length == 0)
+                    break;
+
+                var accPrediction = Predict(batch.ToArray());
+                predictionsAcc.AddRange(accPrediction);
+
+                var speedPrediction = Predict(batch.ToArray());
+                predictionsSpeed.AddRange(speedPrediction);
+            }
+
+            List<object[]> rows = new List<object[]>();
+            int noteTimesIterator = 0;
+            foreach (var (batchPred, batchPredSpeed, batchInput) in predictionsAcc.Zip(predictionsSpeed, segments))
+            {
+                // Assuming pre_segment_size and post_segment_size are available in the context
+                foreach (var (pred, predSpeed, inp) in batchPred.Zip(batchPredSpeed, batchInput.Skip(preSegmentSize).Take(batchInput.Count - preSegmentSize - postSegmentSize).ToArray()))
+                {
+                    if (inp.Sum() == 0)
+                        continue;
+
+                    rows.Add(new object[]
+                    {
+                    Math.Round(pred, 5),
+                    Math.Round(predSpeed, 5),
+                    inp.Take(4*3+10).Sum() > 1 ? 0 : 1,
+                    inp[4*3 + 8] == 1 || inp[4*3 + 10 + 4*3 + 8] == 1 ? 1 : 0,
+                        noteTimes[noteTimesIterator]
+                    });
+                    noteTimesIterator++;
+                }
+            }
+
+            var notes = new Dictionary<string, object>
+            {
+                ["columns"] = new[] { "acc", "speed", "note_color", "is_dot", "note_time" },
+                ["rows"] = rows
+            };
+
+            return notes;
         }
 
         List<(double, double)> scaleCurve = new List<(double, double)>() {
