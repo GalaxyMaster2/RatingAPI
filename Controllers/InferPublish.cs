@@ -1,7 +1,6 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Parser.Map;
-using System;
 
 
 namespace RatingAPI.Controllers
@@ -91,9 +90,9 @@ namespace RatingAPI.Controllers
             return listOutputs;
         }
 
-        public (List<float>, List<double>, int) PredictHitsForMap(DifficultySet difficulty, double timescale = 1)
+        public (List<float>, List<double>, int) PredictHitsForMap(DifficultySet difficulty, double bpm, double njs, double timescale = 1)
         {
-            var (segments, songName, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, timescale);
+            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, bpm, njs, timescale);
             if (segments.Count == 0)
             {
                 return (new List<float>(), new List<double>(), freePoints);
@@ -451,9 +450,9 @@ namespace RatingAPI.Controllers
             return GetAccForMultiplierScale(multiplier);
         }
 
-        public double GetAIAcc(DifficultySet difficulty, double timescale)
+        public double GetAIAcc(DifficultySet difficulty, double bpm, double njs, double timescale)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, bpm, njs, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
             double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
             AIacc = adjustedAIacc;

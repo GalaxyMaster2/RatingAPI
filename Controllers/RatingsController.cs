@@ -1,33 +1,65 @@
 using beatleader_analyzer;
-using beatleader_analyzer.BeatmapScanner.Data;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
-using RatingAPI.Utils;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 
 namespace RatingAPI.Controllers
 {
-    
-    public class LackMapCalculation {
+    public class LackMapCalculation
+    {
         [JsonPropertyName("avg_pattern_rating")]
-        public double PatternRating { get; set; }
+        public double PatternRating { get; set; } = 0;
         [JsonPropertyName("balanced_pass_diff")]
-        public double PassRating { get; set; }
+        public double PassRating { get; set; } = 0;
         [JsonPropertyName("linear_rating")]
-        public double LinearRating { get; set; }
-        
+        public double LinearRating { get; set; } = 0;
+
         [JsonPropertyName("balanced_tech")]
-        public double TechRating { get; set; }
+        public double TechRating { get; set; } = 0;
         [JsonPropertyName("low_note_nerf")]
-        public double LowNoteNerf { get; set; }
+        public double LowNoteNerf { get; set; } = 0;
     }
 
-    public class RatingResult {
-        [JsonPropertyName("AIAcc")]
-        public double AccRating { get; set; }
+    public class RatingResult
+    {
+        [JsonPropertyName("predicted_acc")]
+        public double PredictedAcc { get; set; } = 0;
+        [JsonPropertyName("acc_rating")]
+        public double AccRating { get; set; } = 0;
         [JsonPropertyName("lack_map_calculation")]
-        public LackMapCalculation LackMapCalculation { get; set; }
+        public LackMapCalculation LackMapCalculation { get; set; } = new();
+        [JsonPropertyName("pointlist")]
+        public List<Point> PointList { get; set; } = new();
+    }
+
+    public class Point
+    {
+        public double x { get; set; } = 0;
+        public double y { get; set; } = 0;
+
+        public Point()
+        {
+
+        }
+
+        public Point(double x, double y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public List<Point> ToPoints(List<(double x, double y)> curve)
+        {
+            List<Point> points = new();
+
+            foreach (var p in curve)
+            {
+                points.Add(new(p.x, p.y));
+            }
+
+            return points;
+        }
     }
 
     public class RatingsController : Controller
@@ -51,46 +83,61 @@ namespace RatingAPI.Controllers
             };
             var results = new Dictionary<string, RatingResult>();
             foreach ((var name, var timescale) in modifiers) {
-                results[name] = GetBLRatings(hash, mode, diff, timescale);
-                Console.WriteLine("Acc:" + results[name].AccRating + " pass:" + results[name].LackMapCalculation.PassRating);
+                results[name] = GetBLRatings(hash, mode, GetDiffLabel(diff), timescale);
             }
             Console.WriteLine(sw.ElapsedMilliseconds);
 
             return results;
         }
 
-        public RatingResult GetBLRatings(string hash, string mode, int diff, double timescale) {
-            // Download the map
-            Download.Map(hash);
-            // Fetch the ratings (and send the data to Parser at the same time)
-            var difficulty = FormattingUtils.GetDiffLabel(diff);
-            List<Ratings> ratings = Analyze.GetDataFromPathOne($"{Download.maps_dir}/{hash}", mode, difficulty, (float)timescale);
-            if(ratings == null || ratings.Count == 0) // Error during the data fetching, early return.
+        public string GetDiffLabel(int difficulty)
+        {
+            switch (difficulty)
             {
-                return new RatingResult
-                {
-                    AccRating = 0,
-                    LackMapCalculation = new() { 
-                        PassRating = 0, 
-                    TechRating = 0, 
-                    LowNoteNerf = 0, 
-                    LinearRating = 0, 
-                    PatternRating = 0 
-                    }
-                };
+                case 1: return "Easy";
+                case 3: return "Normal";
+                case 5: return "Hard";
+                case 7: return "Expert";
+                case 9: return "ExpertPlus";
+                default: return difficulty.ToString();
             }
-            // Now fetch the acc rating with the data ready to be used from Parser
-            var acc = new InferPublish().GetAIAcc(Parse.GetBeatmap().Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == difficulty), timescale);
-            return new RatingResult {
-                AccRating = acc,
-                LackMapCalculation = new () { 
-                    PassRating = ratings[0].Pass, 
-                    TechRating = ratings[0].Tech, 
-                    LowNoteNerf = ratings[0].Nerf, 
-                    LinearRating = ratings[0].Linear, 
-                    PatternRating = ratings[0].Pattern 
-                }
+        }
+
+        public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
+            Downloader downloader = new();
+            Analyze analyzer = new();
+            Parse parser = new();
+            var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
+            if (mapset == null) return new();
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
+            if (beatmapSets == null) return new();
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == diff);
+            if (data == null) return new();
+            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == diff);
+            if (map == null) return new();
+            var ratings = analyzer.GetRating(map.Data, mode, diff, mapset.Info._beatsPerMinute, (float)timescale).FirstOrDefault();
+            if (ratings == null) return new();
+            var predictedAcc = new InferPublish().GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+            var lack = new LackMapCalculation
+            {
+                PassRating = ratings.Pass,
+                TechRating = ratings.Tech,
+                LowNoteNerf = ratings.Nerf,
+                LinearRating = ratings.Linear,
+                PatternRating = ratings.Pattern
             };
+            AccRating ar = new();
+            var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
+            Curve curve = new();
+            var pointList = curve.GetCurve(predictedAcc, accRating, lack, mode, timescale);
+            RatingResult result = new()
+            {
+                PredictedAcc = predictedAcc,
+                AccRating = accRating,
+                LackMapCalculation = lack,
+                PointList = pointList
+            };
+            return result;
         }
     }
 }
