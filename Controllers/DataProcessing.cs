@@ -231,60 +231,6 @@ namespace RatingAPI.Controllers
             return segmentCount * 20 * 8;
         }
 
-        public JObject V3_3_0_to_V3(JObject V3_0_0mapData)
-        {
-            var newMapData = (JObject)V3_0_0mapData.DeepClone();
-
-            foreach (var bpmEvent in newMapData.Value<JArray>("bpmEvents"))
-            {
-                bpmEvent["b"] = bpmEvent.Value<int?>("b") ?? 0;
-                bpmEvent["m"] = bpmEvent.Value<int?>("m") ?? 0;
-            }
-
-            foreach (var colorNote in newMapData.Value<JArray>("colorNotes"))
-            {
-                colorNote["b"] = colorNote.Value<int?>("b") ?? 0;
-                colorNote["x"] = colorNote.Value<int?>("x") ?? 0;
-                colorNote["y"] = colorNote.Value<int?>("y") ?? 0;
-                colorNote["a"] = colorNote.Value<int?>("a") ?? 0;
-                colorNote["c"] = colorNote.Value<int?>("c") ?? 0;
-                colorNote["d"] = colorNote.Value<int?>("d") ?? 0;
-            }
-
-            foreach (var bombNote in newMapData.Value<JArray>("bombNotes"))
-            {
-                bombNote["b"] = bombNote.Value<int?>("b") ?? 0;
-                bombNote["x"] = bombNote.Value<int?>("x") ?? 0;
-                bombNote["y"] = bombNote.Value<int?>("y") ?? 0;
-            }
-
-            foreach (var obstacle in newMapData.Value<JArray>("obstacles"))
-            {
-                obstacle["b"] = obstacle.Value<int?>("b") ?? 0;
-                obstacle["x"] = obstacle.Value<int?>("x") ?? 0;
-                obstacle["y"] = obstacle.Value<int?>("y") ?? 0;
-                obstacle["d"] = obstacle.Value<int?>("d") ?? 0;
-                obstacle["w"] = obstacle.Value<int?>("w") ?? 0;
-                obstacle["h"] = obstacle.Value<int?>("h") ?? 0;
-            }
-
-            foreach (var burstSlider in newMapData.Value<JArray>("burstSliders"))
-            {
-                burstSlider["b"] = burstSlider.Value<int?>("b") ?? 0;
-                burstSlider["c"] = burstSlider.Value<int?>("c") ?? 0;
-                burstSlider["x"] = burstSlider.Value<int?>("x") ?? 0;
-                burstSlider["y"] = burstSlider.Value<int?>("y") ?? 0;
-                burstSlider["d"] = burstSlider.Value<int?>("d") ?? 0;
-                burstSlider["tb"] = burstSlider.Value<int?>("tb") ?? 0;
-                burstSlider["tx"] = burstSlider.Value<int?>("tx") ?? 0;
-                burstSlider["ty"] = burstSlider.Value<int?>("ty") ?? 0;
-                burstSlider["sc"] = burstSlider.Value<int?>("sc") ?? 8;
-                burstSlider["s"] = burstSlider.Value<int?>("s") ?? 1;
-            }
-
-            return newMapData;
-        }
-
         public (double? njs, List<Tuple<double, string>> mapNotes, string songName, int freePoints) GetMapData(DifficultySet difficulty)
         {
             double? njs = Parse.GetBeatmap().Info._difficultyBeatmapSets.

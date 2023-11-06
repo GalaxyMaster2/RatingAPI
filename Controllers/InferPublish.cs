@@ -13,23 +13,10 @@ namespace RatingAPI.Controllers
         private DataProcessing dataProcessing = new DataProcessing();
 
         private static object inferenceSessionLock = new();
-        private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
+        private static InferenceSession inferenceSession = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_acc.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
 
         // Replace with this to use gpu. Requires Microsoft.ML.OnnxRuntime.Gpu nuget
         //private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
-
-        public string GetDiffLabel(int difficulty)
-        {
-            switch (difficulty)
-            {
-                case 1: return "Easy";
-                case 3: return "Normal";
-                case 5: return "Hard";
-                case 7: return "Expert";
-                case 9: return "ExpertPlus";
-                default: return difficulty.ToString();
-            }
-        }
 
         public int GetMultiplierForCombo(int combo)
         {
