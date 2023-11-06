@@ -5,7 +5,7 @@ namespace RatingAPI.Controllers
 {
     public class Downloader
     {
-        public string maps_dir = "C:\\maps";
+        public string maps_dir = "D:\\maps";
 
         public string Map(string hash)
         {

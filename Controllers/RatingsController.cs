@@ -29,14 +29,13 @@ namespace RatingAPI.Controllers
         public double AccRating { get; set; } = 0;
         [JsonPropertyName("lack_map_calculation")]
         public LackMapCalculation LackMapCalculation { get; set; } = new();
+        [JsonPropertyName("pointlist")]
         public List<Point> PointList { get; set; } = new();
     }
 
     public class Point
     {
-        [JsonPropertyName("x")]
         public double x { get; set; } = 0;
-        [JsonPropertyName("y")]
         public double y { get; set; } = 0;
 
         public Point()
