@@ -12,6 +12,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Analyzer">
+      <HintPath>dll\Analyzer.dll</HintPath>
+    </Reference>
+    <Reference Include="NVorbis">
+      <HintPath>dll\NVorbis.dll</HintPath>
+    </Reference>
+    <Reference Include="Parser">
+      <HintPath>dll\Parser.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="model_sleep_4LSTM_acc.onnx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
