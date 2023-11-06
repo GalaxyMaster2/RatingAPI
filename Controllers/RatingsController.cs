@@ -1,6 +1,7 @@
 using beatleader_analyzer;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
+using RatingAPI.Utils;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 
@@ -65,6 +66,9 @@ namespace RatingAPI.Controllers
     public class RatingsController : Controller
     {
         private readonly ILogger<RatingsController> _logger;
+        private readonly Downloader downloader = new();
+        private readonly Analyze analyzer = new();
+        private readonly Parse parser = new();
 
         public RatingsController(ILogger<RatingsController> logger)
         {
@@ -83,30 +87,14 @@ namespace RatingAPI.Controllers
             };
             var results = new Dictionary<string, RatingResult>();
             foreach ((var name, var timescale) in modifiers) {
-                results[name] = GetBLRatings(hash, mode, GetDiffLabel(diff), timescale);
+                results[name] = GetBLRatings(hash, mode, FormattingUtils.GetDiffLabel(diff), timescale);
             }
             Console.WriteLine(sw.ElapsedMilliseconds);
 
             return results;
         }
 
-        public string GetDiffLabel(int difficulty)
-        {
-            switch (difficulty)
-            {
-                case 1: return "Easy";
-                case 3: return "Normal";
-                case 5: return "Hard";
-                case 7: return "Expert";
-                case 9: return "ExpertPlus";
-                default: return difficulty.ToString();
-            }
-        }
-
         public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
-            Downloader downloader = new();
-            Analyze analyzer = new();
-            Parse parser = new();
             var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
             if (mapset == null) return new();
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);

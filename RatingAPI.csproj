@@ -7,8 +7,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="beatleader-analyzer\**" />
+    <Compile Remove="beatleader-parser\**" />
+    <Content Remove="beatleader-analyzer\**" />
+    <Content Remove="beatleader-parser\**" />
+    <EmbeddedResource Remove="beatleader-analyzer\**" />
+    <EmbeddedResource Remove="beatleader-parser\**" />
+    <None Remove="beatleader-analyzer\**" />
+    <None Remove="beatleader-parser\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.16.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="beatleader-analyzer\beatleader-analyzer\Analyzer.csproj" />
+    <ProjectReference Include="beatleader-parser\beatleader-parser\Parser.csproj" />
   </ItemGroup>
 
   <ItemGroup>
