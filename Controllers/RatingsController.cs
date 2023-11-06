@@ -1,4 +1,5 @@
 using beatleader_analyzer;
+using beatleader_analyzer.BeatmapScanner.Data;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
@@ -57,12 +58,20 @@ namespace RatingAPI.Controllers
             Download.Map(hash);
             // Fetch the ratings (and send the data to Parser at the same time)
             var difficulty = GetDiffLabel(diff);
-            List<double> ratings = Analyze.GetDataFromPathOne($"{Download.maps_dir}/{hash}", mode, difficulty, (float)timescale);
+            List<Ratings> ratings = Analyze.GetDataFromPathOne($"{Download.maps_dir}/{hash}", mode, difficulty, (float)timescale);
+            if(ratings == null || ratings.Count == 0) // Error during the data fetching, early return.
+            {
+                return new RatingResult
+                {
+                    AIAcc = 0,
+                    lack_map_calculation = new() { 0, 0, 0, 0, 0 }
+                };
+            }
             // Now fetch the acc rating with the data ready to be used from Parser
             var acc = new InferPublish().GetAIAcc(Parse.GetBeatmap().Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == difficulty), timescale);
             return new RatingResult {
                 AIAcc = acc,
-                lack_map_calculation = ratings
+                lack_map_calculation = new() { ratings[0].Pass, ratings[0].Tech, ratings[0].Nerf, ratings[0].Linear, ratings[0].Pattern }
             };
         }
     }
