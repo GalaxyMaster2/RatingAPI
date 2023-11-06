@@ -23,10 +23,44 @@ namespace RatingAPI.Controllers
 
     public class RatingResult
     {
-        [JsonPropertyName("AIAcc")]
+        [JsonPropertyName("predicted_acc")]
+        public double PredictedAcc { get; set; } = 0;
+        [JsonPropertyName("acc_rating")]
         public double AccRating { get; set; } = 0;
         [JsonPropertyName("lack_map_calculation")]
         public LackMapCalculation LackMapCalculation { get; set; } = new();
+        public List<Point> PointList { get; set; } = new();
+    }
+
+    public class Point
+    {
+        [JsonPropertyName("x")]
+        public double x { get; set; } = 0;
+        [JsonPropertyName("y")]
+        public double y { get; set; } = 0;
+
+        public Point()
+        {
+
+        }
+
+        public Point(double x, double y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public List<Point> ToPoints(List<(double x, double y)> curve)
+        {
+            List<Point> points = new();
+
+            foreach (var p in curve)
+            {
+                points.Add(new(p.x, p.y));
+            }
+
+            return points;
+        }
     }
 
     public class RatingsController : Controller
@@ -84,7 +118,7 @@ namespace RatingAPI.Controllers
             if (map == null) return new();
             var ratings = analyzer.GetRating(map.Data, mode, diff, mapset.Info._beatsPerMinute, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
-            var acc = new InferPublish().GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+            var predictedAcc = new InferPublish().GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,
@@ -93,10 +127,16 @@ namespace RatingAPI.Controllers
                 LinearRating = ratings.Linear,
                 PatternRating = ratings.Pattern
             };
+            AccRating ar = new();
+            var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
+            Curve curve = new();
+            var pointList = curve.GetCurve(predictedAcc, accRating, lack, mode, timescale);
             RatingResult result = new()
             {
-                AccRating = acc,
+                PredictedAcc = predictedAcc,
+                AccRating = accRating,
                 LackMapCalculation = lack,
+                PointList = pointList
             };
             return result;
         }
