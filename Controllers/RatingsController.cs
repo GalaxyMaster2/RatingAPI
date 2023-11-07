@@ -99,13 +99,14 @@ namespace RatingAPI.Controllers
         [HttpGet("~/json/{hash}/{mode}/{diff}/full/time-scale/{scale}")]
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
-            var mapset = parser.TryLoadPath(downloader.Map(hash));
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
             if (mapset == null) return null;
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
             if (beatmapSets == null) return null;
-            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == FormattingUtils.GetDiffLabel(diff));
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == difficulty);
             if (data == null) return null;
-            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == FormattingUtils.GetDiffLabel(diff));
+            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == difficulty);
             if (map == null) return null;
 
             return new Dictionary<string, object>
@@ -115,7 +116,7 @@ namespace RatingAPI.Controllers
         }
 
         public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
-            var mapset = parser.TryLoadPath(downloader.Map(hash));
+            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, diff);
             if (mapset == null) return new();
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
             if (beatmapSets == null) return new();
