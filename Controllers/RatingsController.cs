@@ -98,7 +98,7 @@ namespace RatingAPI.Controllers
                 if (beatmapSets == null) return results;
                 var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
                 if (data == null) return results;
-                var map = mapset.Difficulties.FirstOrDefault();
+                var map = mapset.Difficulty;
                 if (map == null) return results;
                 foreach ((var name, var timescale) in modifiers)
                 {
@@ -116,11 +116,11 @@ namespace RatingAPI.Controllers
             var difficulty = FormattingUtils.GetDiffLabel(diff);
             var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
             if (mapset == null) return null;
-            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
             if (beatmapSets == null) return null;
-            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == difficulty);
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
             if (data == null) return null;
-            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == difficulty);
+            var map = mapset.Difficulty;
             if (map == null) return null;
 
             return new Dictionary<string, object>

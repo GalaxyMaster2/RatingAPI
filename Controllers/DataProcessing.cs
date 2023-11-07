@@ -75,8 +75,7 @@ namespace RatingAPI.Controllers
                         $"{n.x}{n.y}{GetNoteDirection(n.CutDirection, n.AngleOffset)}{n.Color}"
                     ))
                     .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
-                    .ToList(); ;
-            
+                    .ToList();
             return mapNotes;
         }
 
