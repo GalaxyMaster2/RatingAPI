@@ -116,8 +116,9 @@ namespace RatingAPI.Controllers
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
+            lack = ModifyRatings(lack, data._noteJumpMovementSpeed * timescale, mode);
             Curve curve = new();
-            var pointList = curve.GetCurve(predictedAcc, accRating, lack, mode, timescale);
+            var pointList = curve.GetCurve(predictedAcc, accRating, lack);
             RatingResult result = new()
             {
                 PredictedAcc = predictedAcc,
@@ -126,6 +127,28 @@ namespace RatingAPI.Controllers
                 PointList = pointList
             };
             return result;
+        }
+
+        public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs, string characteristic)
+        {
+            double buff = 1f;
+            if (njs >= 30)
+            {
+                buff = 0.1 + Math.Exp(0.01 * (njs - 30));
+            }
+            else if (njs > 20)
+            {
+                buff = 1 + 0.01 * (njs - 20);
+            }
+            ratings.PassRating *= buff;
+            ratings.TechRating *= buff;
+
+            if(characteristic == "OneSaber")
+            {
+                ratings.PassRating *= 0.9;
+            }
+
+            return ratings;
         }
     }
 }

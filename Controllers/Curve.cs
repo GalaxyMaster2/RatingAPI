@@ -1,8 +1,10 @@
-﻿namespace RatingAPI.Controllers
+﻿using MathNet.Numerics.Interpolation;
+
+namespace RatingAPI.Controllers
 {
     public class Curve
     {
-        public List<(double, double)> baseCurve = new()
+        public List<(double x, double y)> baseCurve = new()
         {
                 (1.0, 7.424),
                 (0.999, 6.241),
@@ -37,29 +39,49 @@
                 (0.6, 0.256),
                 (0.0, 0.000), };
 
-        public List<Point> GetCurve(double predictedAcc, double accRating, LackMapCalculation lackRatings, string characteristic, double timescale)
+        public List<Point> GetCurve(double predictedAcc, double accRating, LackMapCalculation lackRatings)
         {
-            Point point = new();
-            var curve = point.ToPoints(baseCurve).ToList();
+            List<(double x, double y)> belowThreshold = new();
+            List<(double x, double y)> aboveThreshold = new();
 
-            var patternNerf = 1 - 0.1 * lackRatings.PatternRating;
-            var patternBuff = 1 + 0.1 * lackRatings.PatternRating;
-            var linearNerf = 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
-            var oneSaberNerf = 0.95;
-            var sfBuff = 1 + lackRatings.TechRating / 200;
-            var fsBuff = 1 + lackRatings.TechRating / 500;
-            var accBuff = 1 + 0.025 * (8 - accRating);
-            for (int i = 0; i < curve.Count; i++)
+            foreach (var p in baseCurve)
             {
-                if (accRating <= 8 && curve[i].x >= predictedAcc) curve[i].y *= accBuff;
-                if (timescale == 1.5) curve[i].y *= sfBuff;
-                if (timescale == 1.2) curve[i].y *= fsBuff;
-                if (curve[i].x > 0.95) curve[i].y *= patternBuff;
-                else if (curve[i].x < 0.95) curve[i].y *= patternNerf;
-                curve[i].y *= linearNerf;
-                if (characteristic == "OneSaber") curve[i].y *= oneSaberNerf;
+                double newY = p.y;
+                if (p.x >= predictedAcc - 0.01)
+                {
+                    if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
+                    newY *= 1 + 0.1 * lackRatings.PatternRating;
+                    newY *= (1 - lackRatings.LinearRating / 100 * lackRatings.PassRating);
+                    aboveThreshold.Add(new(p.x, newY));
+                }
+                else
+                { 
+                    newY *= 1 - 0.1 * lackRatings.PatternRating;
+                    belowThreshold.Add(new(p.x, newY));
+                }
             }
 
+            List<double> xValues = aboveThreshold.Select(point => point.x).ToList();
+            List<double> yValues = aboveThreshold.Select(point => point.y).ToList();
+            xValues.AddRange(belowThreshold.Select(point => point.x));
+            yValues.AddRange(belowThreshold.Select(point => point.y));
+            xValues.Sort();
+            yValues.Sort();
+            
+            IInterpolation interpolation = CubicSpline.InterpolateNatural(xValues, yValues);
+
+            List<(double, double)> modifiedList = new();
+
+            foreach (var p in baseCurve)
+            {
+                double x = p.x;
+                double interpolatedY = interpolation.Interpolate(x);
+                modifiedList.Add((x, interpolatedY));
+            }
+
+            Point point = new();
+            List<Point> curve = point.ToPoints(modifiedList).ToList();
+            curve = curve.OrderBy(x => x.x).Reverse().ToList();
             return curve;
         }
     }
