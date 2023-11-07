@@ -99,7 +99,7 @@ namespace RatingAPI.Controllers
         [HttpGet("~/json/{hash}/{mode}/{diff}/full/time-scale/{scale}")]
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
-            var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
+            var mapset = parser.TryLoadPath(downloader.Map(hash));
             if (mapset == null) return null;
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
             if (beatmapSets == null) return null;
@@ -115,7 +115,7 @@ namespace RatingAPI.Controllers
         }
 
         public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
-            var mapset = parser.TryLoadPath(downloader.Map(hash)).FirstOrDefault();
+            var mapset = parser.TryLoadPath(downloader.Map(hash));
             if (mapset == null) return new();
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
             if (beatmapSets == null) return new();

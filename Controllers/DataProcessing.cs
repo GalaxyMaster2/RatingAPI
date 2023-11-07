@@ -68,11 +68,11 @@ namespace RatingAPI.Controllers
         // Method to get map notes from json
         public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultySet beatmap, double bpm)
         {
-            List<Tuple<double, string>> mapNotes = beatmap.Data.colorNotes
+            List<Tuple<double, string>> mapNotes = beatmap.Data.Notes
                     .Where(n => n.x < 1000 && n.x >= 0 && n.y < 1000 && n.y >= 0)
                     .Select(n => Tuple.Create(
-                        (double)n.b * (60 / bpm),
-                        $"{n.x}{n.y}{GetNoteDirection(n.d, n.a)}{n.c}"
+                        (double)n.Beats * (60 / bpm),
+                        $"{n.x}{n.y}{GetNoteDirection(n.CutDirection, n.AngleOffset)}{n.Color}"
                     ))
                     .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
                     .ToList(); ;
@@ -221,12 +221,12 @@ namespace RatingAPI.Controllers
 
         public int GetFreePointsForMap(DifficultySet beatmap)
         {
-            if (beatmap.Data.burstSliders.Count == 0) return 0;
+            if (beatmap.Data.Chains.Count == 0) return 0;
 
             int segmentCount = 0;
-            foreach (var burstSlider in beatmap.Data.burstSliders)
+            foreach (var burstSlider in beatmap.Data.Chains)
             {
-                segmentCount += burstSlider.sc;
+                segmentCount += burstSlider.Segment;
             }
             return segmentCount * 20 * 8;
         }
