@@ -5,11 +5,16 @@ namespace RatingAPI.Controllers
 {
     public class Downloader
     {
-        public string maps_dir = "C:\\maps";
+        private string _mapsDirectory = "/home/maps";
+
+        public Downloader(string mapsDirectory)
+        {
+            _mapsDirectory = mapsDirectory;
+        }
 
         public string Map(string hash)
         {
-            string mapDir = Path.Combine(maps_dir, hash);
+            string mapDir = Path.Combine(_mapsDirectory, hash.ToUpper());
 
             if (Directory.Exists(mapDir))
             {

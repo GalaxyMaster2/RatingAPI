@@ -67,18 +67,19 @@ namespace RatingAPI.Controllers
     public class RatingsController : Controller
     {
         private readonly ILogger<RatingsController> _logger;
-        private readonly Downloader downloader = new();
+        private readonly Downloader downloader;
         private readonly Analyze analyzer = new();
         private readonly Parse parser = new();
 
         private readonly InferPublish ai = new();
 
-        public RatingsController(ILogger<RatingsController> logger)
+        public RatingsController(IConfiguration configuration, ILogger<RatingsController> logger)
         {
             _logger = logger;
+            downloader = new(configuration.GetValue<string>("MapsPath") ?? "");
         }
 
-        [HttpGet("~/ppai/{hash}/{mode}/{diff}")]
+        [HttpGet("~/ppai2/{hash}/{mode}/{diff}")]
         public ActionResult<Dictionary<string, RatingResult>> Get(string hash, string mode, int diff)
         {
             Stopwatch sw = Stopwatch.StartNew();
@@ -104,8 +105,7 @@ namespace RatingAPI.Controllers
                     results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
                 }
             }
-
-            Console.WriteLine(sw.ElapsedMilliseconds);
+            _logger.LogWarning("Took " + sw.ElapsedMilliseconds);
 
             return results;
         }

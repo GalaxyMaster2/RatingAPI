@@ -9,32 +9,41 @@
     }
   },
   "profiles": {
+    "RatingApi": {
+      "commandName": "Project",
+      "launchUrl": "user/id",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://localhost:5050",
+      "dotnetRunMessages": true
+    },
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "launchUrl": "ppai/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
+      "launchUrl": "ppai2/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
       "applicationUrl": "http://localhost:5168",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "MyDevelopment"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "launchUrl": "ppai/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
+      "launchUrl": "ppai2/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
       "applicationUrl": "https://localhost:7248;http://localhost:5168",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "MyDevelopment"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "ppai/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
+      "launchUrl": "ppai2/0BFAB2B62C6D7EA1C3587C48EFD1A0EEC365D983/Standard/5",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "MyDevelopment"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
   }
