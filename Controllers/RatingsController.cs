@@ -89,14 +89,22 @@ namespace RatingAPI.Controllers
                 ("SFS", 1.5),
             };
             var results = new Dictionary<string, RatingResult>();
-            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, FormattingUtils.GetDiffLabel(diff));
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
             if (mapset != null)
             {
+                var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
+                if (beatmapSets == null) return results;
+                var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
+                if (data == null) return results;
+                var map = mapset.Difficulties.FirstOrDefault();
+                if (map == null) return results;
                 foreach ((var name, var timescale) in modifiers)
                 {
-                    results[name] = GetBLRatings(mapset, mode, FormattingUtils.GetDiffLabel(diff), timescale);
+                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
                 }
             }
+
             Console.WriteLine(sw.ElapsedMilliseconds);
 
             return results;
@@ -121,16 +129,11 @@ namespace RatingAPI.Controllers
             };
         }
 
-        public RatingResult GetBLRatings(BeatmapV3 mapset, string mode, string diff, double timescale) {
-            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
-            if (beatmapSets == null) return new();
-            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == diff);
-            if (data == null) return new();
-            var map = mapset.Difficulties.FirstOrDefault(x => x.Characteristic == mode && x.Difficulty == diff);
-            if (map == null) return new();
-            var ratings = analyzer.GetRating(map.Data, mode, diff, mapset.Info._beatsPerMinute, (float)timescale).FirstOrDefault();
+        public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale) {
+            
+            var ratings = analyzer.GetRating(map.Data, characteristic, difficulty, (float)bpm, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
-            var predictedAcc = ai.GetAIAcc(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+            var predictedAcc = ai.GetAIAcc(map, bpm, njs, timescale);
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,
@@ -141,7 +144,7 @@ namespace RatingAPI.Controllers
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
-            lack = ModifyRatings(lack, data._noteJumpMovementSpeed * timescale, mode);
+            lack = ModifyRatings(lack, njs * timescale, characteristic);
             Curve curve = new();
             var pointList = curve.GetCurve(predictedAcc, accRating, lack);
             RatingResult result = new()
