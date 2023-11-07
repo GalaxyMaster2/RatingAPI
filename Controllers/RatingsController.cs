@@ -1,6 +1,7 @@
 using beatleader_analyzer;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
+using Parser.Map;
 using RatingAPI.Utils;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
@@ -88,8 +89,13 @@ namespace RatingAPI.Controllers
                 ("SFS", 1.5),
             };
             var results = new Dictionary<string, RatingResult>();
-            foreach ((var name, var timescale) in modifiers) {
-                results[name] = GetBLRatings(hash, mode, FormattingUtils.GetDiffLabel(diff), timescale);
+            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, FormattingUtils.GetDiffLabel(diff));
+            if (mapset != null)
+            {
+                foreach ((var name, var timescale) in modifiers)
+                {
+                    results[name] = GetBLRatings(mapset, mode, FormattingUtils.GetDiffLabel(diff), timescale);
+                }
             }
             Console.WriteLine(sw.ElapsedMilliseconds);
 
@@ -115,9 +121,7 @@ namespace RatingAPI.Controllers
             };
         }
 
-        public RatingResult GetBLRatings(string hash, string mode, string diff, double timescale) {
-            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, diff);
-            if (mapset == null) return new();
+        public RatingResult GetBLRatings(BeatmapV3 mapset, string mode, string diff, double timescale) {
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(x => x._beatmapCharacteristicName == mode);
             if (beatmapSets == null) return new();
             var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(x => x._difficulty == diff);
