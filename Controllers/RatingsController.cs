@@ -137,7 +137,7 @@ namespace RatingAPI.Controllers
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,
-                TechRating = ratings.Tech,
+                TechRating = ratings.Tech * 10,
                 LowNoteNerf = ratings.Nerf,
                 LinearRating = ratings.Linear,
                 PatternRating = ratings.Pattern
