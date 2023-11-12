@@ -44,12 +44,19 @@ namespace RatingAPI.Controllers
             List<(double x, double y)> belowThreshold = new();
             List<(double x, double y)> aboveThreshold = new();
 
+            double buff = 1;
+            if(lackRatings.LinearRating <= 0.20)
+            {
+                buff = 1 + 0.4 * (0.2 - lackRatings.LinearRating);
+            }
+
             foreach (var p in baseCurve)
             {
                 double newY = p.y;
                 if (p.x >= predictedAcc - 0.01)
                 {
                     if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
+                    newY *= buff;
                     newY *= 1 + 0.1 * lackRatings.PatternRating;
                     newY *= (1 - lackRatings.LinearRating / 100 * lackRatings.PassRating);
                     aboveThreshold.Add(new(p.x, newY));
