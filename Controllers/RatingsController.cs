@@ -92,6 +92,7 @@ namespace RatingAPI.Controllers
             var results = new Dictionary<string, RatingResult>();
             var difficulty = FormattingUtils.GetDiffLabel(diff);
             var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
+            if (hash == "397F4485345E33CC0CA1212425C19274EC855740") mode = "OneSaber"; // Awe (One Saber)
             if (mapset != null)
             {
                 var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
