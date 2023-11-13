@@ -161,14 +161,11 @@ namespace RatingAPI.Controllers
         public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs, string characteristic)
         {
             double buff = 1f;
-            if (njs >= 30)
-            {
-                buff = 0.1 + Math.Exp(0.01 * (njs - 30));
-            }
-            else if (njs > 20)
+            if (njs > 20)
             {
                 buff = 1 + 0.01 * (njs - 20);
             }
+
             ratings.PassRating *= buff;
             ratings.TechRating *= buff;
 

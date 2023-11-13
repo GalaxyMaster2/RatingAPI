@@ -41,13 +41,12 @@ namespace RatingAPI.Controllers
 
         public List<Point> GetCurve(double predictedAcc, double accRating, LackMapCalculation lackRatings)
         {
-            List<(double x, double y)> belowThreshold = new();
-            List<(double x, double y)> aboveThreshold = new();
+            List<(double x, double y)> points = new();
 
             double buff = 1;
             if(lackRatings.LinearRating <= 0.20)
             {
-                buff = 1 + 0.4 * (0.2 - lackRatings.LinearRating);
+                buff = 1 + 0.5 * (0.2 - lackRatings.LinearRating);
             }
 
             foreach (var p in baseCurve)
@@ -59,21 +58,18 @@ namespace RatingAPI.Controllers
                     newY *= buff;
                     newY *= 1 + 0.1 * lackRatings.PatternRating;
                     newY *= (1 - lackRatings.LinearRating / 100 * lackRatings.PassRating);
-                    aboveThreshold.Add(new(p.x, newY));
                 }
                 else
-                { 
+                {
                     newY *= 1 - 0.1 * lackRatings.PatternRating;
-                    belowThreshold.Add(new(p.x, newY));
                 }
+
+
+                points.Add(new(p.x, newY));
             }
 
-            List<double> xValues = aboveThreshold.Select(point => point.x).ToList();
-            List<double> yValues = aboveThreshold.Select(point => point.y).ToList();
-            xValues.AddRange(belowThreshold.Select(point => point.x));
-            yValues.AddRange(belowThreshold.Select(point => point.y));
-            xValues.Sort();
-            yValues.Sort();
+            List<double> xValues = points.Select(point => point.x).ToList();
+            List<double> yValues = points.Select(point => point.y).ToList();
             
             IInterpolation interpolation = CubicSpline.InterpolateNatural(xValues, yValues);
 
