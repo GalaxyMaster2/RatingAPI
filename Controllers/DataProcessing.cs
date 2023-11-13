@@ -71,7 +71,7 @@ namespace RatingAPI.Controllers
             List<Tuple<double, string>> mapNotes = beatmap.Data.Notes
                     .Where(n => n.x < 1000 && n.x >= 0 && n.y < 1000 && n.y >= 0)
                     .Select(n => Tuple.Create(
-                        (double)n.Beats * (60 / bpm),
+                        (double)n.BpmTime * (60 / bpm),
                         $"{n.x}{n.y}{GetNoteDirection(n.CutDirection, n.AngleOffset)}{n.Color}"
                     ))
                     .OrderBy(x => x.Item1).ThenBy(x => x.Item2)
