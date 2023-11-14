@@ -85,7 +85,51 @@ namespace RatingAPI.Controllers
             Point point = new();
             List<Point> curve = point.ToPoints(modifiedList).ToList();
             curve = curve.OrderBy(x => x.x).Reverse().ToList();
+            curve = ToPp(accRating, lackRatings.PassRating, lackRatings.TechRating, curve);
             return curve;
+        }
+
+        public List<Point> ToPp(double accRating, double passRating, double techRating, List<Point> curve)
+        {
+            foreach (var p in curve)
+            {
+                double passPP = 15f * MathF.Exp(MathF.Pow((float)passRating, 1 / 2.62f)) - 30f;
+                if (double.IsInfinity(passPP) || double.IsNaN(passPP) || double.IsNegativeInfinity(passPP) || passPP < 0)
+                {
+                    passPP = 0;
+                }
+                double accPP = Curve2(p.x, curve) * accRating * 34f;
+                double techPP = MathF.Exp((float)(1.9 * p.x)) * 1.08f * techRating;
+
+                p.y = 650f * MathF.Pow((float)(passPP + accPP + techPP), 1.3f) / MathF.Pow(650f, 1.3f);
+            }
+
+            return curve;
+        }
+
+        public double ToStars(List<Point> curve)
+        {
+           return Curve2(0.96, curve) / 52;
+        }
+
+        public double Curve2(double acc, List<Point> curve)
+        {
+            int i = 0;
+            for (; i < curve.Count; i++)
+            {
+                if (curve[i].x <= acc)
+                {
+                    break;
+                }
+            }
+
+            if (i == 0)
+            {
+                i = 1;
+            }
+
+            double middle_dis = (acc - curve[i - 1].x) / (curve[i].x - curve[i - 1].x);
+            return (float)(curve[i - 1].y + middle_dis * (curve[i].y - curve[i - 1].y));
         }
     }
 }

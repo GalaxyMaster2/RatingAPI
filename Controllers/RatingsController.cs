@@ -29,6 +29,8 @@ namespace RatingAPI.Controllers
         public double PredictedAcc { get; set; } = 0;
         [JsonPropertyName("acc_rating")]
         public double AccRating { get; set; } = 0;
+        [JsonPropertyName("star_rating")]
+        public double StarRating { get; set; } = 0;
         [JsonPropertyName("lack_map_calculation")]
         public LackMapCalculation LackMapCalculation { get; set; } = new();
         [JsonPropertyName("pointlist")]
@@ -148,12 +150,14 @@ namespace RatingAPI.Controllers
             lack = ModifyRatings(lack, njs * timescale, characteristic);
             Curve curve = new();
             var pointList = curve.GetCurve(predictedAcc, accRating, lack);
+            var star = curve.ToStars(pointList);
             RatingResult result = new()
             {
                 PredictedAcc = predictedAcc,
                 AccRating = accRating,
                 LackMapCalculation = lack,
-                PointList = pointList
+                PointList = pointList,
+                StarRating = star
             };
             return result;
         }
