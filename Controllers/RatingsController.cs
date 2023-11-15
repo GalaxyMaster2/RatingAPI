@@ -29,8 +29,6 @@ namespace RatingAPI.Controllers
         public double PredictedAcc { get; set; } = 0;
         [JsonPropertyName("acc_rating")]
         public double AccRating { get; set; } = 0;
-        [JsonPropertyName("star_rating")]
-        public double StarRating { get; set; } = 0;
         [JsonPropertyName("lack_map_calculation")]
         public LackMapCalculation LackMapCalculation { get; set; } = new();
         [JsonPropertyName("pointlist")]
@@ -94,7 +92,6 @@ namespace RatingAPI.Controllers
             var results = new Dictionary<string, RatingResult>();
             var difficulty = FormattingUtils.GetDiffLabel(diff);
             var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
-            if (hash == "397F4485345E33CC0CA1212425C19274EC855740") mode = "OneSaber"; // Awe (One Saber)
             if (mapset != null)
             {
                 var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
@@ -147,22 +144,20 @@ namespace RatingAPI.Controllers
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
-            lack = ModifyRatings(lack, njs * timescale, characteristic);
+            lack = ModifyRatings(lack, njs * timescale);
             Curve curve = new();
             var pointList = curve.GetCurve(predictedAcc, accRating, lack);
-            var star = curve.ToStars(pointList);
             RatingResult result = new()
             {
                 PredictedAcc = predictedAcc,
                 AccRating = accRating,
                 LackMapCalculation = lack,
-                PointList = pointList,
-                StarRating = star
+                PointList = pointList
             };
             return result;
         }
 
-        public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs, string characteristic)
+        public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs)
         {
             double buff = 1f;
             if (njs > 20)
@@ -172,11 +167,6 @@ namespace RatingAPI.Controllers
 
             ratings.PassRating *= buff;
             ratings.TechRating *= buff;
-
-            if(characteristic == "OneSaber")
-            {
-                ratings.PassRating *= 0.9;
-            }
 
             return ratings;
         }
