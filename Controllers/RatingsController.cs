@@ -10,8 +10,8 @@ namespace RatingAPI.Controllers
 {
     public class LackMapCalculation
     {
-        [JsonPropertyName("avg_pattern_rating")]
-        public double PatternRating { get; set; } = 0;
+        [JsonPropertyName("multi_rating")]
+        public double MultiRating { get; set; } = 0;
         [JsonPropertyName("balanced_pass_diff")]
         public double PassRating { get; set; } = 0;
         [JsonPropertyName("linear_rating")]
@@ -142,7 +142,7 @@ namespace RatingAPI.Controllers
                 TechRating = ratings.Tech * 10,
                 LowNoteNerf = ratings.Nerf,
                 LinearRating = ratings.Linear,
-                PatternRating = ratings.Pattern
+                MultiRating = ratings.Multi
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
