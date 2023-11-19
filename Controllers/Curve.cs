@@ -57,11 +57,18 @@ namespace RatingAPI.Controllers
                     if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
                     newY *= buff;
                     newY *= 1 + 0.1 * lackRatings.MultiRating;
-                    newY *= (1 - lackRatings.LinearRating / 100 * lackRatings.PassRating);
+                    newY *= 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
                 }
                 else
                 {
-                    newY *= 1 - 0.1 * lackRatings.MultiRating;
+                    if(lackRatings.MultiRating > 0.1)
+                    {
+                        newY *= 1 - Math.Log(lackRatings.MultiRating * 10, 1.666) / 100;
+                    }
+                    else
+                    {
+                        newY *= 1 - 0.01 * lackRatings.MultiRating;
+                    }
                 }
 
 
