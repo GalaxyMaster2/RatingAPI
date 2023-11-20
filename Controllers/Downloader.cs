@@ -14,6 +14,12 @@ namespace RatingAPI.Controllers
 
         public string Map(string hash)
         {
+            string lowerCaseDir = Path.Combine(_mapsDirectory, hash.ToLower());
+            if (Directory.Exists(lowerCaseDir))
+            {
+                return lowerCaseDir;
+            }
+
             string mapDir = Path.Combine(_mapsDirectory, hash.ToUpper());
 
             if (Directory.Exists(mapDir))
