@@ -43,54 +43,60 @@ namespace RatingAPI.Controllers
         {
             List<(double x, double y)> points = new();
 
-            double buff = 1;
-            if(lackRatings.LinearRating <= 0.20)
+            double accBuff = 0;
+            if (accRating <= 8)
             {
-                buff = 1 + 0.5 * (0.2 - lackRatings.LinearRating);
+                accBuff = 0.05 * (8 - accRating);
             }
 
+            double multiBuff = 0.2 * lackRatings.MultiRating;
+            double multiNerf = 0;
+            if (lackRatings.MultiRating > 0.1)
+            {
+                multiNerf = -2 * Math.Log(lackRatings.MultiRating * 10, 1.666) / 100;
+            }
+            else
+            {
+                multiNerf = -0.02 * lackRatings.MultiRating;
+            }
+
+
+            double linearNerf = -2 * lackRatings.LinearRating / 100 * lackRatings.PassRating;
+
+            double unlinearBuff = 0;
+            if (lackRatings.LinearRating <= 0.20)
+            {
+                unlinearBuff = 1 * (0.2 - lackRatings.LinearRating);
+            }
+
+            double pivot = predictedAcc - 0.01;
+            double upperBound = 1;
+            double lowerBound = 0.80;
             foreach (var p in baseCurve)
             {
                 double newY = p.y;
-                if (p.x >= predictedAcc - 0.01)
+                if (p.x >= pivot)
                 {
-                    if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
-                    newY *= buff;
-                    newY *= 1 + 0.1 * lackRatings.MultiRating;
-                    newY *= 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
+                    double xDist = (p.x - pivot) / (upperBound - pivot);
+                    if (p.x > upperBound) xDist = 1;
+                    newY *= 1 + accBuff * xDist;
+                    newY *= 1 + unlinearBuff * xDist;
+                    newY *= 1 + multiBuff * xDist;
+                    newY *= 1 + linearNerf * xDist;
                 }
                 else
                 {
-                    if(lackRatings.MultiRating > 0.1)
-                    {
-                        newY *= 1 - Math.Log(lackRatings.MultiRating * 10, 1.666) / 100;
-                    }
-                    else
-                    {
-                        newY *= 1 - 0.01 * lackRatings.MultiRating;
-                    }
+                    double xDist = (p.x - pivot) / (lowerBound - pivot);
+                    if (p.x < lowerBound) xDist = 1;
+                    newY *= 1 + multiNerf * xDist;
                 }
 
 
                 points.Add(new(p.x, newY));
             }
 
-            List<double> xValues = points.Select(point => point.x).ToList();
-            List<double> yValues = points.Select(point => point.y).ToList();
-            
-            IInterpolation interpolation = CubicSpline.InterpolateNatural(xValues, yValues);
-
-            List<(double, double)> modifiedList = new();
-
-            foreach (var p in baseCurve)
-            {
-                double x = p.x;
-                double interpolatedY = interpolation.Interpolate(x);
-                modifiedList.Add((x, interpolatedY));
-            }
-
             Point point = new();
-            List<Point> curve = point.ToPoints(modifiedList).ToList();
+            List<Point> curve = point.ToPoints(points).ToList();
             curve = curve.OrderBy(x => x.x).Reverse().ToList();
 
             return curve;
