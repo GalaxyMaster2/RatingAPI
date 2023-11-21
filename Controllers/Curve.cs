@@ -57,11 +57,10 @@ namespace RatingAPI.Controllers
                     if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
                     newY *= buff;
                     newY *= 1 + 0.1 * lackRatings.MultiRating;
-                    newY *= 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
                 }
                 else
                 {
-                    if(lackRatings.MultiRating > 0.1)
+                    if (lackRatings.MultiRating > 0.1)
                     {
                         newY *= 1 - Math.Log(lackRatings.MultiRating * 10, 1.666) / 100;
                     }
@@ -70,30 +69,39 @@ namespace RatingAPI.Controllers
                         newY *= 1 - 0.01 * lackRatings.MultiRating;
                     }
                 }
-
+                newY *= 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
 
                 points.Add(new(p.x, newY));
             }
 
-            List<double> xValues = points.Select(point => point.x).ToList();
-            List<double> yValues = points.Select(point => point.y).ToList();
-            
-            IInterpolation interpolation = CubicSpline.InterpolateNatural(xValues, yValues);
-
-            List<(double, double)> modifiedList = new();
-
-            foreach (var p in baseCurve)
+            points = MovingAverage(points, 3);
+            for (int i = 0; i < points.Count; i++)
             {
-                double x = p.x;
-                double interpolatedY = interpolation.Interpolate(x);
-                modifiedList.Add((x, interpolatedY));
+                points[i] = (points[i].x, Math.Round(points[i].y, 3));
             }
 
             Point point = new();
-            List<Point> curve = point.ToPoints(modifiedList).ToList();
+            List<Point> curve = point.ToPoints(points).ToList();
             curve = curve.OrderBy(x => x.x).Reverse().ToList();
 
             return curve;
+        }
+
+        public static List<(double, double)> MovingAverage(List<(double, double)> data, int windowSize)
+        {
+            List<double> dat = data.Select(x => x.Item2).ToList();
+
+            for (int i = 0; i < dat.Count - 10; i++)
+            {
+                int start = Math.Max(0, i - windowSize / 2);
+                int end = Math.Min(data.Count - 1, i + windowSize / 2);
+
+                // Calculate the average of the data points within the window
+                double average = dat.Skip(start).Take(end - start + 1).Average();
+                data[i] = (data[i].Item1, average);
+            }
+
+            return data;
         }
 
         public double ToStars(double acc, double accRating, LackMapCalculation ratings, List<Point> curve)
