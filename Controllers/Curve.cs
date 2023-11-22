@@ -74,7 +74,6 @@ namespace RatingAPI.Controllers
                 points.Add(new(p.x, newY));
             }
 
-            points = MovingAverage(points, 3);
             for (int i = 0; i < points.Count; i++)
             {
                 points[i] = (points[i].x, Math.Round(points[i].y, 3));
@@ -85,23 +84,6 @@ namespace RatingAPI.Controllers
             curve = curve.OrderBy(x => x.x).Reverse().ToList();
 
             return curve;
-        }
-
-        public static List<(double, double)> MovingAverage(List<(double, double)> data, int windowSize)
-        {
-            List<double> dat = data.Select(x => x.Item2).ToList();
-
-            for (int i = 0; i < dat.Count - 10; i++)
-            {
-                int start = Math.Max(0, i - windowSize / 2);
-                int end = Math.Min(data.Count - 1, i + windowSize / 2);
-
-                // Calculate the average of the data points within the window
-                double average = dat.Skip(start).Take(end - start + 1).Average();
-                data[i] = (data[i].Item1, average);
-            }
-
-            return data;
         }
 
         public double ToStars(double acc, double accRating, LackMapCalculation ratings, List<Point> curve)
