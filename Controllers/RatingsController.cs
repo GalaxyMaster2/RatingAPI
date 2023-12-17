@@ -133,7 +133,7 @@ namespace RatingAPI.Controllers
 
         public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale) {
             
-            var ratings = analyzer.GetRating(map.Data, characteristic, difficulty, (float)bpm, (float)timescale).FirstOrDefault();
+            var ratings = analyzer.GetRating(map.Data, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
             var predictedAcc = ai.GetAIAcc(map, bpm, njs, timescale);
             var lack = new LackMapCalculation

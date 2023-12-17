@@ -41,8 +41,9 @@ namespace RatingAPI.Controllers
 
         public List<Point> GetCurve(double predictedAcc, double accRating, LackMapCalculation lackRatings)
         {
-            List<(double x, double y)> points = new();
+            List<(double x, double y)> points = baseCurve.ToList();
 
+            /*
             double buff = 1;
             if(lackRatings.LinearRating <= 0.20)
             {
@@ -52,6 +53,7 @@ namespace RatingAPI.Controllers
             foreach (var p in baseCurve)
             {
                 double newY = p.y;
+                
                 if (p.x >= predictedAcc - 0.01)
                 {
                     if (accRating <= 8) newY *= 1 + 0.025 * (8 - accRating);
@@ -70,14 +72,15 @@ namespace RatingAPI.Controllers
                     }
                 }
                 newY *= 1 - lackRatings.LinearRating / 100 * lackRatings.PassRating;
-
+                
                 points.Add(new(p.x, newY));
             }
-
+            
             for (int i = 0; i < points.Count; i++)
             {
                 points[i] = (points[i].x, Math.Round(points[i].y, 3));
             }
+            */
 
             Point point = new();
             List<Point> curve = point.ToPoints(points).ToList();
