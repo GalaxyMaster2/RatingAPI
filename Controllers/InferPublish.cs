@@ -2,7 +2,6 @@
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Parser.Map;
 
-
 namespace RatingAPI.Controllers
 {
     public class InferPublish
@@ -140,54 +139,19 @@ namespace RatingAPI.Controllers
 
         public Dictionary<string, object>? PredictHitsForMapNotes(DifficultySet difficulty, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
         {
-            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, bpm, njs, timescale);
-            if (segments.Count == 0)
-                return null;
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, bpm, njs, timescale);
+            double AIacc = GetMapAccForHits(accs, freePoints);
+            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
+            AIacc = adjustedAIacc;
 
-            int batchSize = 16;
+            var rows = accs.Select((acc, index) => new List<double> { acc, noteTimes[index] });
 
-            List<float[]> predictionsAcc = new List<float[]>();
-            List<float[]> predictionsSpeed = new List<float[]>();
-
-            for (int i = 0; i < segments.Count; i += batchSize)
-            {
-                var batch = segments.GetRange(i, Math.Min(batchSize, segments.Count - i)).ToArray();
-                if (batch.Length == 0)
-                    break;
-
-                var accPrediction = Predict(batch.ToArray());
-                predictionsAcc.AddRange(accPrediction);
-
-                var speedPrediction = Predict(batch.ToArray());
-                predictionsSpeed.AddRange(speedPrediction);
-            }
-
-            List<object[]> rows = new List<object[]>();
-            int noteTimesIterator = 0;
-            foreach (var (batchPred, batchPredSpeed, batchInput) in predictionsAcc.Zip(predictionsSpeed, segments))
-            {
-                // Assuming pre_segment_size and post_segment_size are available in the context
-                foreach (var (pred, predSpeed, inp) in batchPred.Zip(batchPredSpeed, batchInput.Skip(preSegmentSize).Take(batchInput.Count - preSegmentSize - postSegmentSize).ToArray()))
-                {
-                    if (inp.Sum() == 0)
-                        continue;
-
-                    rows.Add(new object[]
-                    {
-                    Math.Round(pred, 5),
-                    Math.Round(predSpeed, 5),
-                    inp.Take(4*3+10).Sum() > 1 ? 0 : 1,
-                    inp[4*3 + 8] == 1 || inp[4*3 + 10 + 4*3 + 8] == 1 ? 1 : 0,
-                        noteTimes[noteTimesIterator]
-                    });
-                    noteTimesIterator++;
-                }
-            }
 
             var notes = new Dictionary<string, object>
             {
-                ["columns"] = new[] { "acc", "speed", "note_color", "is_dot", "note_time" },
-                ["rows"] = rows
+                ["columns"] = new[] { "acc", "note_time" },
+                ["rows"] = rows,
+                ["AIacc"] = AIacc,
             };
 
             return notes;
