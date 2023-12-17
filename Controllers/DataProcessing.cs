@@ -62,6 +62,9 @@ namespace RatingAPI.Controllers
             }
 
             int noteAngle = (DirectionToAngle[direction] - (int)Math.Round(angle / 45) * 45) % 360;
+            if (noteAngle < 0) {
+                noteAngle += 360;
+            }
             return AngleToDirection[noteAngle];
         }
 
