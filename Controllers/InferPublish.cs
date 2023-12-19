@@ -467,7 +467,8 @@ namespace RatingAPI.Controllers
             double attemptsScale = (farmSessionLength / mapLength) / baseAttemptsCount;
             double noteScaler = 1 / (1 + 5 * Math.Pow(noteScale, 0.69)) * 6.9;
 
-            double attemptsScaler = (Math.Pow(Math.Log(attemptsScale) + 2.7081502061025433, 0.69) / 2.0);
+            double attemptMultiplier = Math.Log(attemptsScale) + 2.7081502061025433;
+            double attemptsScaler = Math.Pow(attemptMultiplier >= 0 ? attemptMultiplier : 0, 0.69) / 2.0;
             double multiplier = GetMultiplierForAccScale(acc) + noteScaler * attemptsScaler * baseMultiplier * (Math.Min(1, baseNoteCount * 10.0 / noteCount));
             return GetAccForMultiplierScale(multiplier);
         }
