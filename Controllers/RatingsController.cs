@@ -112,6 +112,38 @@ namespace RatingAPI.Controllers
             return results;
         }
 
+        [HttpGet("~/ppai2/link/{mode}/{diff}")]
+        public ActionResult<Dictionary<string, RatingResult>> GetByLink(string mode, int diff, [FromQuery] string link)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            var modifiers = new List<(string, double)>() {
+                ("SS", 0.85),
+                ("none", 1),
+                ("FS", 1.2),
+                ("SFS", 1.5),
+            };
+            var results = new Dictionary<string, RatingResult>();
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapset = parser.TryDownloadLink(link).FirstOrDefault();
+            if (mapset != null)
+            {
+                var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(s => s._beatmapCharacteristicName == mode);
+                if (beatmapSets == null) return results;
+                var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(b => b._difficultyRank == diff);
+                if (data == null) return results;
+                var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == mode && d.Difficulty == difficulty);
+                if (map == null) return results;
+
+                foreach ((var name, var timescale) in modifiers)
+                {
+                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+                }
+            }
+            _logger.LogWarning("Took " + sw.ElapsedMilliseconds);
+
+            return results;
+        }
+
         [HttpGet("~/json/{hash}/{mode}/{diff}/full/time-scale/{scale}")]
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
@@ -123,6 +155,25 @@ namespace RatingAPI.Controllers
             var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
             if (data == null) return null;
             var map = mapset.Difficulty;
+            if (map == null) return null;
+
+            return new Dictionary<string, object>
+            {
+                ["notes"] = ai.PredictHitsForMapNotes(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+            };
+        }
+
+        [HttpGet("~/json/link/{mode}/{diff}/full/time-scale/{scale}")]
+        public ActionResult<Dictionary<string, object>?> GetByLink(string mode, int diff, double scale, [FromQuery] string link)
+        {
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapset = parser.TryDownloadLink(link).FirstOrDefault();
+            if (mapset == null) return null;
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(s => s._beatmapCharacteristicName == mode);
+            if (beatmapSets == null) return null;
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(b => b._difficultyRank == diff);
+            if (data == null) return null;
+            var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == mode && d.Difficulty == difficulty);
             if (map == null) return null;
 
             return new Dictionary<string, object>
