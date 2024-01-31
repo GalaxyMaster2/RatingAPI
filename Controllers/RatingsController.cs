@@ -23,6 +23,8 @@ namespace RatingAPI.Controllers
         public double TechRating { get; set; } = 0;
         [JsonPropertyName("low_note_nerf")]
         public double LowNoteNerf { get; set; } = 0;
+        [JsonPropertyName("stamina_rating")]
+        public double StaminaRating {  get; set; } = 0;
     }
 
     public class RatingResult
@@ -403,7 +405,8 @@ namespace RatingAPI.Controllers
             {
                 PassRating = ratings.Pass,
                 TechRating = ratings.Tech * 10,
-                LowNoteNerf = ratings.Nerf
+                LowNoteNerf = ratings.Nerf,
+                StaminaRating = ratings.Stamina
                 //LinearRating = ratings.Linear,
                 //MultiRating = ratings.Multi
             };
