@@ -15,6 +15,7 @@ namespace RatingAPI.Controllers
         private static object inferenceSessionLock = new();
         private static InferenceSession inferenceSessionAcc = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_acc.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
         private static InferenceSession inferenceSessionSpeed = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_speed.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
+        private static InferenceSession tagSession = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "tagging_model.onnx"));
 
         // Replace with this to use gpu. Requires Microsoft.ML.OnnxRuntime.Gpu nuget
         //private static InferenceSession inferenceSession = new InferenceSession(AppContext.BaseDirectory + "\\model_sleep_4LSTM_acc.onnx", Microsoft.ML.OnnxRuntime.SessionOptions.MakeSessionOptionWithCudaProvider());
@@ -480,6 +481,21 @@ namespace RatingAPI.Controllers
             double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
             AIacc = adjustedAIacc;
             return AIacc;
+        }
+
+        // https://deepnote.com/workspace/beatleader-d4376e93-8e9f-461e-9143-e88974e31843/project/BeatLeader-38f67242-d369-4190-9d39-6f957aa93130/notebook/Map%20Categories-9defcb89bd864ca9ac11a55b0f7f9298
+        public float[] Tag(float acc, float tech, float pass) {
+
+            var input = new DenseTensor<float>(new float[] { acc, tech, pass }, new int[] { 1, 3 });
+
+            var inputs = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor("float_input", input)
+            };
+
+            using var results = tagSession.Run(inputs);
+
+            return results[1].AsTensor<float>().ToArray();
         }
     }
 }

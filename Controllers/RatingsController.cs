@@ -144,6 +144,12 @@ namespace RatingAPI.Controllers
             return results;
         }
 
+        [HttpGet("~/ppai2/tag")]
+        public ActionResult<float[]> Tag([FromQuery] float acc, [FromQuery] float pass, [FromQuery] float tech)
+        {
+            return ai.Tag(acc, tech, pass);
+        }
+
         [HttpGet("~/json/{hash}/{mode}/{diff}/full/time-scale/{scale}")]
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
