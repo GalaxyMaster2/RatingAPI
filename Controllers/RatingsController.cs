@@ -90,6 +90,8 @@ namespace RatingAPI.Controllers
                 ("none", 1),
                 ("FS", 1.2),
                 ("SFS", 1.5),
+                ("BFS", 1.2),
+                ("BSF", 1.5),
             };
             var results = new Dictionary<string, RatingResult>();
             var difficulty = FormattingUtils.GetDiffLabel(diff);
@@ -104,7 +106,11 @@ namespace RatingAPI.Controllers
                 if (map == null) return results;
                 foreach ((var name, var timescale) in modifiers)
                 {
-                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+                    var njs = data._noteJumpMovementSpeed;
+                    if (name == "BFS" || name == "BSF") {
+                        njs = (float)(((njs * timescale - njs) / 2 + njs) / timescale);
+                    }
+                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, njs, timescale);
                 }
             }
             _logger.LogWarning("Took " + sw.ElapsedMilliseconds);
@@ -145,7 +151,7 @@ namespace RatingAPI.Controllers
         }
 
         [HttpGet("~/ppai2/tag")]
-        public ActionResult<float[]> Tag([FromQuery] float acc, [FromQuery] float pass, [FromQuery] float tech)
+        public ActionResult<string> Tag([FromQuery] float acc, [FromQuery] float pass, [FromQuery] float tech)
         {
             return ai.Tag(acc, tech, pass);
         }

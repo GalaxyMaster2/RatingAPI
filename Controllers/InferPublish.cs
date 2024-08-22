@@ -484,7 +484,7 @@ namespace RatingAPI.Controllers
         }
 
         // https://deepnote.com/workspace/beatleader-d4376e93-8e9f-461e-9143-e88974e31843/project/BeatLeader-38f67242-d369-4190-9d39-6f957aa93130/notebook/Map%20Categories-9defcb89bd864ca9ac11a55b0f7f9298
-        public float[] Tag(float acc, float tech, float pass) {
+        public string Tag(float acc, float tech, float pass) {
 
             var input = new DenseTensor<float>(new float[] { acc, tech, pass }, new int[] { 1, 3 });
 
@@ -495,7 +495,7 @@ namespace RatingAPI.Controllers
 
             using var results = tagSession.Run(inputs);
 
-            return results[1].AsTensor<float>().ToArray();
+            return results.First().AsTensor<string>().First();
         }
     }
 }

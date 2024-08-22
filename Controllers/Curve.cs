@@ -91,7 +91,7 @@ namespace RatingAPI.Controllers
 
         public double ToStars(double acc, double accRating, LackMapCalculation ratings, List<Point> curve)
         {
-            double passPP = 15f * MathF.Exp(MathF.Pow((float)ratings.PassRating, 1 / 2.62f)) - 30f;
+            double passPP = 15.2f * MathF.Exp(MathF.Pow((float)ratings.PassRating, 1 / 2.62f)) - 30f;
             if (double.IsInfinity(passPP) || double.IsNaN(passPP) || double.IsNegativeInfinity(passPP) || passPP < 0)
             {
                 passPP = 0;
