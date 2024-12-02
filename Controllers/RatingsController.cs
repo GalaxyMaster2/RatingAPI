@@ -2,6 +2,7 @@ using beatleader_analyzer;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
 using Parser.Map;
+using Parser.Map.Difficulty.V3.Base;
 using RatingAPI.Utils;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
@@ -81,6 +82,43 @@ namespace RatingAPI.Controllers
             downloader = new(configuration.GetValue<string>("MapsPath") ?? "");
         }
 
+        public string CustomModeMapping(string mode) {
+            switch (mode)
+            {
+                case "InvertedStandard":
+                    return "Standard";
+                default:
+                    break;
+            }
+
+            return mode;
+        }
+
+        public DifficultyV3 CustomModeDataMapping(string mode, DifficultyV3 mapdata) {
+            int numberOfLines = 4;
+            bool is_ME = false;
+            bool is_ME_or_NE = false;
+            DifficultyV3 result = mapdata;
+            switch (mode)
+            {
+                case "VerticalStandard": 
+                    result = Parser.Utils.ChiralitySupport.Mirror_Vertical(mapdata, false, is_ME_or_NE, is_ME); 
+                    break;
+                case "HorizontalStandard": 
+                    result = Parser.Utils.ChiralitySupport.Mirror_Horizontal(mapdata, numberOfLines, false, is_ME_or_NE, is_ME); 
+                    break;
+                case "InverseStandard": 
+                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, true, true, is_ME_or_NE, is_ME); 
+                    break;
+                case "InvertedStandard": 
+                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, false, false, is_ME_or_NE, is_ME); 
+                    break;
+                    
+            }
+
+            return result;
+        }
+
         [HttpGet("~/ppai2/{hash}/{mode}/{diff}")]
         public ActionResult<Dictionary<string, RatingResult>> Get(string hash, string mode, int diff)
         {
@@ -95,7 +133,7 @@ namespace RatingAPI.Controllers
             };
             var results = new Dictionary<string, RatingResult>();
             var difficulty = FormattingUtils.GetDiffLabel(diff);
-            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
+            var mapset = parser.TryLoadPath(downloader.Map(hash), CustomModeMapping(mode), difficulty);
             if (mapset != null)
             {
                 var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
@@ -160,7 +198,7 @@ namespace RatingAPI.Controllers
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
             var difficulty = FormattingUtils.GetDiffLabel(diff);
-            var mapset = parser.TryLoadPath(downloader.Map(hash), mode, difficulty);
+            var mapset = parser.TryLoadPath(downloader.Map(hash), CustomModeMapping(mode), difficulty);
             if (mapset == null) return null;
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
             if (beatmapSets == null) return null;
@@ -171,7 +209,7 @@ namespace RatingAPI.Controllers
 
             return new Dictionary<string, object>
             {
-                ["notes"] = ai.PredictHitsForMapNotes(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
             };
         }
 
@@ -181,24 +219,24 @@ namespace RatingAPI.Controllers
             var difficulty = FormattingUtils.GetDiffLabel(diff);
             var mapset = parser.TryDownloadLink(link).FirstOrDefault();
             if (mapset == null) return null;
-            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(s => s._beatmapCharacteristicName == mode);
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault(s => s._beatmapCharacteristicName == CustomModeMapping(mode));
             if (beatmapSets == null) return null;
             var data = beatmapSets._difficultyBeatmaps.FirstOrDefault(b => b._difficultyRank == diff);
             if (data == null) return null;
-            var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == mode && d.Difficulty == difficulty);
+            var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == CustomModeMapping(mode) && d.Difficulty == difficulty);
             if (map == null) return null;
 
             return new Dictionary<string, object>
             {
-                ["notes"] = ai.PredictHitsForMapNotes(map, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
             };
         }
 
         public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale) {
-            
-            var ratings = analyzer.GetRating(map.Data, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
+            var mapdata = CustomModeDataMapping(characteristic, map.Data);
+            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
-            var predictedAcc = ai.GetAIAcc(map, bpm, njs, timescale);
+            var predictedAcc = ai.GetAIAcc(mapdata, bpm, njs, timescale);
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,

@@ -1,6 +1,7 @@
 ﻿using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Parser.Map;
+using Parser.Map.Difficulty.V3.Base;
 
 namespace RatingAPI.Controllers
 {
@@ -93,9 +94,9 @@ namespace RatingAPI.Controllers
             return listOutputs;
         }
 
-        public (List<float>, List<double>, int) PredictHitsForMap(DifficultySet difficulty, double bpm, double njs, double timescale = 1)
+        public (List<float>, List<double>, int) PredictHitsForMap(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1)
         {
-            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(difficulty, bpm, njs, timescale);
+            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(mapdata, bpm, njs, timescale);
             if (segments.Count == 0)
             {
                 return (new List<float>(), new List<double>(), freePoints);
@@ -138,9 +139,9 @@ namespace RatingAPI.Controllers
             return (accs, noteTimes, freePoints);
         }
 
-        public Dictionary<string, object>? PredictHitsForMapNotes(DifficultySet difficulty, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
+        public Dictionary<string, object>? PredictHitsForMapNotes(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, bpm, njs, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, njs, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
             double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
             AIacc = adjustedAIacc;
@@ -474,9 +475,9 @@ namespace RatingAPI.Controllers
             return GetAccForMultiplierScale(multiplier);
         }
 
-        public double GetAIAcc(DifficultySet difficulty, double bpm, double njs, double timescale)
+        public double GetAIAcc(DifficultyV3 mapdata, double bpm, double njs, double timescale)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(difficulty, bpm, njs, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, njs, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
             double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
             AIacc = adjustedAIacc;

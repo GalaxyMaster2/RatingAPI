@@ -15,6 +15,7 @@ using beatleader_parser;
 using beatleader_analyzer;
 using Parser.Map;
 using Parser.Map.Difficulty.V3.Grid;
+using Parser.Map.Difficulty.V3.Base;
 
 namespace RatingAPI.Controllers
 {
@@ -69,9 +70,9 @@ namespace RatingAPI.Controllers
         }
 
         // Method to get map notes from json
-        public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultySet beatmap, double bpm)
+        public static List<Tuple<double, string>> GetMapNotesFromJson(DifficultyV3 mapdata, double bpm)
         {
-            List<Tuple<double, string>> mapNotes = beatmap.Data.Notes
+            List<Tuple<double, string>> mapNotes = mapdata.Notes
                     .Where(n => n.x < 1000 && n.x >= 0 && n.y < 1000 && n.y >= 0)
                     .Select(n => Tuple.Create(
                         (double)n.Seconds,
@@ -221,29 +222,29 @@ namespace RatingAPI.Controllers
             return segments;
         }
 
-        public int GetFreePointsForMap(DifficultySet beatmap)
+        public int GetFreePointsForMap(DifficultyV3 mapdata)
         {
-            if (beatmap.Data.Chains.Count == 0) return 0;
+            if (mapdata.Chains.Count == 0) return 0;
 
             int segmentCount = 0;
-            foreach (var burstSlider in beatmap.Data.Chains)
+            foreach (var burstSlider in mapdata.Chains)
             {
-                segmentCount += burstSlider.Segment;
+                segmentCount += burstSlider.SliceCount;
             }
             return segmentCount * 20 * 8;
         }
 
-        public (List<Tuple<double, string>> mapNotes, int freePoints) GetMapData(DifficultySet difficulty, double bpm)
+        public (List<Tuple<double, string>> mapNotes, int freePoints) GetMapData(DifficultyV3 mapdata, double bpm)
         {
-            var mapNotes = GetMapNotesFromJson(difficulty, bpm);
-            var freePoints = GetFreePointsForMap(difficulty);
+            var mapNotes = GetMapNotesFromJson(mapdata, bpm);
+            var freePoints = GetFreePointsForMap(mapdata);
             return (mapNotes, freePoints);
         }
 
-        public (List<List<double[]>> segments, List<double> noteTimes, int freePoints) PreprocessMap(DifficultySet difficulty, double bpm, double njs, double timescale)
+        public (List<List<double[]>> segments, List<double> noteTimes, int freePoints) PreprocessMap(DifficultyV3 mapdata, double bpm, double njs, double timescale)
         {
             var emptyResponse = (new List<List<double[]>>(), new List<double>(), 0);
-            var (mapNotes, freePoints) = GetMapData(difficulty, bpm);
+            var (mapNotes, freePoints) = GetMapData(mapdata, bpm);
             if (mapNotes == null)
             {
                 return emptyResponse;
