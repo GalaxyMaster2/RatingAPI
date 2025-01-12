@@ -228,24 +228,88 @@ namespace RatingAPI.Controllers
             var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
             if (result == null || ratings == null) return null;
 
+            ai.SetMapAccForHits(result.Notes);
+
+            AccRating ar = new();
+            var unmarkedNotes = result.Notes.ToList();
+
             foreach (var item in ratings.PerSwing)
             {
                 var mapnote = mapdata.Notes.FirstOrDefault(n => Math.Abs(n.BpmTime - item.Time) < 0.001);
                 if (mapnote == null) continue;
 
-                var note = result.Notes.FirstOrDefault(n => Math.Abs(n.Time - mapnote.Seconds) < 0.001);
+                var note = unmarkedNotes.FirstOrDefault(n => Math.Abs(n.Time - mapnote.Seconds) < 0.001);
                 if (note != null)
                 {
                     var lack = new LackMapCalculation
                     {
-                        PassRating = item.Pass,
-                        TechRating = item.Tech * 10,
+                        PassRating = item.Pass / 5,
+                        TechRating = item.Tech * (-(Math.Pow(1.4, -(item.Pass / 5))) + 1) * 10 / 5,
                         LowNoteNerf = ratings.Nerf
                     };
                     lack = ModifyRatings(lack, njs * timescale, timescale);
 
                     note.Tech = (float)lack.TechRating;
                     note.Pass = (float)lack.PassRating;
+                    note.Acc = (float)ar.GetRating(note.Acc, item.Pass, item.Tech);
+                    unmarkedNotes.Remove(note);
+                }
+            }
+
+            foreach (var note in unmarkedNotes)
+            {
+                note.Acc = (float)ar.GetRating(note.Acc, 0, 0);
+            }
+
+            // Interpolate values for notes with 0 tech or pass rating
+            for (int i = 0; i < result.Notes.Length; i++)
+            {
+                if (result.Notes[i].Tech == 0 || result.Notes[i].Pass == 0)
+                {
+                    // Find nearest non-zero values before and after
+                    float prevTech = 0, prevPass = 0, nextTech = 0, nextPass = 0;
+                    int prevIndex = i - 1;
+                    int nextIndex = i + 1;
+
+                    while (prevIndex >= 0)
+                    {
+                        if (result.Notes[prevIndex].Tech != 0 && result.Notes[prevIndex].Pass != 0)
+                        {
+                            prevTech = result.Notes[prevIndex].Tech;
+                            prevPass = result.Notes[prevIndex].Pass;
+                            break;
+                        }
+                        prevIndex--;
+                    }
+
+                    while (nextIndex < result.Notes.Length)
+                    {
+                        if (result.Notes[nextIndex].Tech != 0 && result.Notes[nextIndex].Pass != 0)
+                        {
+                            nextTech = result.Notes[nextIndex].Tech;
+                            nextPass = result.Notes[nextIndex].Pass;
+                            break;
+                        }
+                        nextIndex++;
+                    }
+
+                    // Linear interpolation
+                    if (prevTech != 0 && nextTech != 0)
+                    {
+                        float t = (float)(i - prevIndex) / (nextIndex - prevIndex);
+                        result.Notes[i].Tech = prevTech + (nextTech - prevTech) * t;
+                        result.Notes[i].Pass = prevPass + (nextPass - prevPass) * t;
+                    }
+                    else if (prevTech != 0)
+                    {
+                        result.Notes[i].Tech = prevTech;
+                        result.Notes[i].Pass = prevPass;
+                    }
+                    else if (nextTech != 0)
+                    {
+                        result.Notes[i].Tech = nextTech;
+                        result.Notes[i].Pass = nextPass;
+                    }
                 }
             }
 

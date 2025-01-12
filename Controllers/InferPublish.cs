@@ -53,6 +53,21 @@ namespace RatingAPI.Controllers
             return totalScore;
         }
 
+        public void SetMapAccForHits(PredictedNote[] hits)
+        {
+            float maxScore = 0;
+            float totalScore = 0;
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                float multiplier = GetMultiplierForCombo(i + 1);
+                totalScore += (hits[i].Acc * 15 + 100) * multiplier;
+                maxScore += 115 * multiplier;
+
+                hits[i].Acc = totalScore / maxScore;
+            }
+        }
+
         public double GetMapAccForHits(List<float> hits, int freePoints)
         {
             float maxScore = 0;
