@@ -5,6 +5,17 @@ using Parser.Map.Difficulty.V3.Base;
 
 namespace RatingAPI.Controllers
 {
+    public class PredictedNote {
+        public float Time { get; set; }
+        public float Acc { get; set; }
+        public float Pass { get; set; }
+        public float Tech { get; set; }
+    }
+    public class PredictionResult {
+        public float AIAcc { get; set; }
+        public PredictedNote[] Notes { get; set; }
+    }
+
     public class InferPublish
     {
         private const int BatchSize = 4;
@@ -137,6 +148,20 @@ namespace RatingAPI.Controllers
             }
 
             return (accs, noteTimes, freePoints);
+        }
+
+        public PredictionResult? PredictHitsForMapAllNotes(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
+        {
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, njs, timescale);
+            double AIacc = GetMapAccForHits(accs, freePoints);
+            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
+            AIacc = adjustedAIacc;
+
+            return new PredictionResult
+            {
+                Notes = accs.Select((acc, index) => new PredictedNote { Acc = acc, Time = (float)noteTimes[index] }).ToArray(),
+                AIAcc = (float)AIacc,
+            };
         }
 
         public Dictionary<string, object>? PredictHitsForMapNotes(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)

@@ -203,7 +203,9 @@ namespace RatingAPI.Controllers
         public ActionResult<Dictionary<string, object>?> Get(string hash, string mode, int diff, double scale)
         {
             var difficulty = FormattingUtils.GetDiffLabel(diff);
-            var mapset = parser.TryLoadPath(downloader.Map(hash), CustomModeMapping(mode), difficulty);
+            var mapPath = downloader.Map(hash);
+            if (mapPath == null) return NotFound();
+            var mapset = parser.TryLoadPath(mapPath, CustomModeMapping(mode), difficulty);
             if (mapset == null) return null;
             var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
             if (beatmapSets == null) return null;
@@ -215,6 +217,66 @@ namespace RatingAPI.Controllers
             return new Dictionary<string, object>
             {
                 ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+            };
+        }
+
+        [NonAction]
+        private PredictionResult? PredictHits(DifficultyV3 mapdata, double bpm, double njs, string characteristic, string difficulty, double timescale)
+        {
+            var result = ai.PredictHitsForMapAllNotes(mapdata, bpm, njs, timescale);
+
+            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
+            if (result == null || ratings == null) return null;
+
+            foreach (var item in ratings.PerSwing)
+            {
+                var mapnote = mapdata.Notes.FirstOrDefault(n => Math.Abs(n.BpmTime - item.Time) < 0.001);
+                if (mapnote == null) continue;
+
+                var note = result.Notes.FirstOrDefault(n => Math.Abs(n.Time - mapnote.Seconds) < 0.001);
+                if (note != null)
+                {
+                    var lack = new LackMapCalculation
+                    {
+                        PassRating = item.Pass,
+                        TechRating = item.Tech * 10,
+                        LowNoteNerf = ratings.Nerf
+                    };
+                    lack = ModifyRatings(lack, njs * timescale, timescale);
+
+                    note.Tech = (float)lack.TechRating;
+                    note.Pass = (float)lack.PassRating;
+                }
+            }
+
+            return result;
+        }
+
+        [HttpGet("~/ppai2/graph/{hash}/{mode}/{diff}/full")]
+        public ActionResult<Dictionary<string, object>?> GetGraph(string hash, string mode, int diff)
+        {
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapPath = downloader.Map(hash);
+            if (mapPath == null) return NotFound();
+            var mapset = parser.TryLoadPath(mapPath, CustomModeMapping(mode), difficulty);
+            if (mapset == null) return null;
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
+            if (beatmapSets == null) return null;
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
+            if (data == null) return null;
+            var map = mapset.Difficulty;
+            if (map == null) return null;
+
+            var mapdata = CustomModeDataMapping(mode, map.Data);
+            var bpm = mapset.Info._beatsPerMinute;
+            var njs = data._noteJumpMovementSpeed;
+
+            return new Dictionary<string, object>
+            {
+                ["SS"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 0.85),
+                ["base"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.0),
+                ["FS"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.2),
+                ["SF"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.5),
             };
         }
 
@@ -246,9 +308,9 @@ namespace RatingAPI.Controllers
             {
                 PassRating = ratings.Pass,
                 TechRating = ratings.Tech * 10,
-                LowNoteNerf = ratings.Nerf,
-                LinearRating = ratings.Linear,
-                MultiRating = ratings.Multi
+                LowNoteNerf = ratings.Nerf
+                //LinearRating = ratings.Linear,
+                //MultiRating = ratings.Multi
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
