@@ -12,7 +12,7 @@ namespace RatingAPI.Controllers
             _mapsDirectory = mapsDirectory;
         }
 
-        public string Map(string hash)
+        public string? Map(string hash)
         {
             string lowerCaseDir = Path.Combine(_mapsDirectory, hash.ToLower());
             if (Directory.Exists(lowerCaseDir))
@@ -29,9 +29,19 @@ namespace RatingAPI.Controllers
 
             string beatsaverUrl = $"https://beatsaver.com/api/maps/hash/{hash}";
             using var httpClient = new HttpClient();
-            var response = httpClient.GetStringAsync(beatsaverUrl).Result ?? throw new Exception("Error during API request");
-            dynamic? beatsaverData = JsonConvert.DeserializeObject(response) ?? throw new Exception("Error during deserialization");
-            string downloadURL = string.Empty;
+            dynamic? beatsaverData = null;
+            string? downloadURL = null;
+            try {
+                var response = httpClient.GetStringAsync(beatsaverUrl).Result;
+                beatsaverData = response != null ? JsonConvert.DeserializeObject(response) : null;
+                downloadURL = string.Empty;
+            } catch (Exception e) {
+                return null;
+            }
+
+            if (beatsaverData == null) {
+                return null;
+            }
 
             foreach (var version in beatsaverData.versions)
             {
@@ -44,7 +54,7 @@ namespace RatingAPI.Controllers
 
             if (string.IsNullOrEmpty(downloadURL))
             {
-                throw new Exception("Map download URL not found.");
+                return null;
             }
 
             using var client = new HttpClient();
@@ -59,7 +69,7 @@ namespace RatingAPI.Controllers
             string[] extractedFiles = Directory.GetFiles(mapDir);
             foreach (string extractedFile in extractedFiles)
             {
-                if (!extractedFile.EndsWith(".dat"))
+                if (!extractedFile.EndsWith(".dat") && !extractedFile.EndsWith(".json") && !extractedFile.EndsWith(".data"))
                 {
                     try
                     {

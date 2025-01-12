@@ -94,8 +94,8 @@ namespace RatingAPI.Controllers
             double deltaShort = Math.Max(0, 0.5 - delta) * 2;
             double deltaOtherShort = Math.Max(0, 0.5 - deltaOther) * 2;
 
-            int colNumber = noteInfo[0];
-            int rowNumber = noteInfo[1];
+            int colNumber = Math.Clamp(noteInfo[0], 0, 3);
+            int rowNumber = Math.Clamp(noteInfo[1], 0, 2);
             int directionNumber = noteInfo[2];
             int color = noteInfo[3];
 

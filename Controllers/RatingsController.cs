@@ -133,18 +133,23 @@ namespace RatingAPI.Controllers
             };
             var results = new Dictionary<string, RatingResult>();
             var difficulty = FormattingUtils.GetDiffLabel(diff);
-            var mapset = parser.TryLoadPath(downloader.Map(hash), CustomModeMapping(mode), difficulty);
+            var mapPath = downloader.Map(hash);
+            if (mapPath == null) return NotFound();
+            BeatmapV3? mapset = null;
+            try {
+                mapset = parser.TryLoadPath(mapPath);
+            } catch (FileNotFoundException e) {
+                Directory.Delete(mapPath, true);
+                mapPath = downloader.Map(hash);
+                mapset = parser.TryLoadPath(mapPath);
+            }
             if (mapset != null)
             {
-                var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
-                if (beatmapSets == null) return results;
-                var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
-                if (data == null) return results;
-                var map = mapset.Difficulty;
+                var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == CustomModeMapping(mode) && (d.BeatMap._difficultyRank == diff || d.BeatMap._difficulty == difficulty));
                 if (map == null) return results;
                 foreach ((var name, var timescale) in modifiers)
                 {
-                    var njs = data._noteJumpMovementSpeed;
+                    var njs = map.BeatMap._noteJumpMovementSpeed;
                     if (name == "BFS" || name == "BSF") {
                         njs = (float)(((njs * timescale - njs) / 2 + njs) / timescale);
                     }
