@@ -1,6 +1,7 @@
 using beatleader_analyzer;
 using beatleader_parser;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Parser.Map;
 using Parser.Map.Difficulty.V3.Base;
 using RatingAPI.Utils;
@@ -385,11 +386,6 @@ namespace RatingAPI.Controllers
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
-            if (accRating <= 4)
-            {
-                predictedAcc = ai.GetAIAcc(mapdata, bpm, njs, timescale, true);
-                accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
-            }
             accRating *= ratings.Nerf;
             lack = ModifyRatings(lack, njs * timescale, timescale);
             Curve curve = new();
