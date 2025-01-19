@@ -11,12 +11,12 @@ namespace RatingAPI.Controllers
 {
     public class LackMapCalculation
     {
-        [JsonPropertyName("multi_rating")]
-        public double MultiRating { get; set; } = 0;
+        //[JsonPropertyName("multi_rating")]
+        //public double MultiRating { get; set; } = 0;
         [JsonPropertyName("balanced_pass_diff")]
         public double PassRating { get; set; } = 0;
-        [JsonPropertyName("linear_rating")]
-        public double LinearRating { get; set; } = 0;
+        //[JsonPropertyName("linear_rating")]
+        //public double LinearRating { get; set; } = 0;
 
         [JsonPropertyName("balanced_tech")]
         public double TechRating { get; set; } = 0;
@@ -82,7 +82,8 @@ namespace RatingAPI.Controllers
             downloader = new(configuration.GetValue<string>("MapsPath") ?? "");
         }
 
-        public string CustomModeMapping(string mode) {
+        public string CustomModeMapping(string mode)
+        {
             switch (mode)
             {
                 case "InvertedStandard":
@@ -94,26 +95,27 @@ namespace RatingAPI.Controllers
             return mode;
         }
 
-        public DifficultyV3 CustomModeDataMapping(string mode, DifficultyV3 mapdata) {
+        public DifficultyV3 CustomModeDataMapping(string mode, DifficultyV3 mapdata)
+        {
             int numberOfLines = 4;
             bool is_ME = false;
             bool is_ME_or_NE = false;
             DifficultyV3 result = mapdata;
             switch (mode)
             {
-                case "VerticalStandard": 
-                    result = Parser.Utils.ChiralitySupport.Mirror_Vertical(mapdata, false, is_ME_or_NE, is_ME); 
+                case "VerticalStandard":
+                    result = Parser.Utils.ChiralitySupport.Mirror_Vertical(mapdata, false, is_ME_or_NE, is_ME);
                     break;
-                case "HorizontalStandard": 
-                    result = Parser.Utils.ChiralitySupport.Mirror_Horizontal(mapdata, numberOfLines, false, is_ME_or_NE, is_ME); 
+                case "HorizontalStandard":
+                    result = Parser.Utils.ChiralitySupport.Mirror_Horizontal(mapdata, numberOfLines, false, is_ME_or_NE, is_ME);
                     break;
-                case "InverseStandard": 
-                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, true, true, is_ME_or_NE, is_ME); 
+                case "InverseStandard":
+                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, true, true, is_ME_or_NE, is_ME);
                     break;
-                case "InvertedStandard": 
-                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, false, false, is_ME_or_NE, is_ME); 
+                case "InvertedStandard":
+                    result = Parser.Utils.ChiralitySupport.Mirror_Inverse(mapdata, numberOfLines, false, false, is_ME_or_NE, is_ME);
                     break;
-                    
+
             }
 
             return result;
@@ -136,9 +138,12 @@ namespace RatingAPI.Controllers
             var mapPath = downloader.Map(hash);
             if (mapPath == null) return NotFound();
             BeatmapV3? mapset = null;
-            try {
+            try
+            {
                 mapset = parser.TryLoadPath(mapPath);
-            } catch (FileNotFoundException e) {
+            }
+            catch (FileNotFoundException e)
+            {
                 Directory.Delete(mapPath, true);
                 mapPath = downloader.Map(hash);
                 mapset = parser.TryLoadPath(mapPath);
@@ -150,7 +155,8 @@ namespace RatingAPI.Controllers
                 foreach ((var name, var timescale) in modifiers)
                 {
                     var njs = map.BeatMap._noteJumpMovementSpeed;
-                    if (name == "BFS" || name == "BSF") {
+                    if (name == "BFS" || name == "BSF")
+                    {
                         njs = (float)(((njs * timescale - njs) / 2 + njs) / timescale);
                     }
                     results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, njs, timescale);
@@ -363,7 +369,8 @@ namespace RatingAPI.Controllers
             };
         }
 
-        public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale) {
+        public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale)
+        {
             var mapdata = CustomModeDataMapping(characteristic, map.Data);
             var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
             if (ratings == null) return new();
@@ -378,6 +385,12 @@ namespace RatingAPI.Controllers
             };
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
+            if (accRating <= 4)
+            {
+                predictedAcc = ai.GetAIAcc(mapdata, bpm, njs, timescale, true);
+                accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
+            }
+            accRating *= ratings.Nerf;
             lack = ModifyRatings(lack, njs * timescale, timescale);
             Curve curve = new();
             var pointList = curve.GetCurve(predictedAcc, accRating, lack);
@@ -393,14 +406,14 @@ namespace RatingAPI.Controllers
             return result;
         }
 
+        //NJS buff for >24 njs
         public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs, double timescale)
         {
-            if(timescale > 1)
             {
                 double buff = 1f;
-                if (njs > 20)
+                if (njs > 24)
                 {
-                    buff = 1 + 0.01 * (njs - 20);
+                    buff = 1 + 0.01 * (njs - 24);
                 }
 
                 ratings.PassRating *= buff;
