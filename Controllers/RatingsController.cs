@@ -155,12 +155,12 @@ namespace RatingAPI.Controllers
                 if (map == null) return results;
                 foreach ((var name, var timescale) in modifiers)
                 {
-                    var njs = map.BeatMap._noteJumpMovementSpeed;
+                    var njsMult = 1.0;
                     if (name == "BFS" || name == "BSF")
                     {
-                        njs = (float)(((njs * timescale - njs) / 2 + njs) / timescale);
+                        njsMult = ((timescale - 1) / 2 + 1) / timescale;
                     }
-                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, njs, timescale);
+                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, timescale, njsMult);
                 }
             }
             _logger.LogWarning("Took " + sw.ElapsedMilliseconds);
@@ -192,7 +192,7 @@ namespace RatingAPI.Controllers
 
                 foreach ((var name, var timescale) in modifiers)
                 {
-                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, timescale);
+                    results[name] = GetBLRatings(map, mode, difficulty, mapset.Info._beatsPerMinute, timescale);
                 }
             }
             _logger.LogWarning("Took " + sw.ElapsedMilliseconds);
@@ -223,16 +223,16 @@ namespace RatingAPI.Controllers
 
             return new Dictionary<string, object>
             {
-                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, scale)
             };
         }
 
         [NonAction]
-        private PredictionResult? PredictHits(DifficultyV3 mapdata, double bpm, double njs, string characteristic, string difficulty, double timescale)
+        private PredictionResult? PredictHits(DifficultyV3 mapdata, double bpm, string characteristic, string difficulty, double timescale)
         {
-            var result = ai.PredictHitsForMapAllNotes(mapdata, bpm, njs, timescale);
+            var result = ai.PredictHitsForMapAllNotes(mapdata, bpm, timescale);
 
-            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
+            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)timescale).FirstOrDefault();
             if (result == null || ratings == null) return null;
 
             ai.SetMapAccForHits(result.Notes);
@@ -254,7 +254,6 @@ namespace RatingAPI.Controllers
                         TechRating = item.Tech * (-(Math.Pow(1.4, -(item.Pass / 5))) + 1) * 10 / 5,
                         LowNoteNerf = ratings.Nerf
                     };
-                    lack = ModifyRatings(lack, njs * timescale, timescale);
 
                     note.Tech = (float)lack.TechRating;
                     note.Pass = (float)lack.PassRating;
@@ -340,14 +339,13 @@ namespace RatingAPI.Controllers
 
             var mapdata = CustomModeDataMapping(mode, map.Data);
             var bpm = mapset.Info._beatsPerMinute;
-            var njs = data._noteJumpMovementSpeed;
 
             return new Dictionary<string, object>
             {
-                ["SS"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 0.85),
-                ["base"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.0),
-                ["FS"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.2),
-                ["SF"] = PredictHits(mapdata, bpm, njs, mode, difficulty, 1.5),
+                ["SS"] = PredictHits(mapdata, bpm, mode, difficulty, 0.85),
+                ["base"] = PredictHits(mapdata, bpm, mode, difficulty, 1.0),
+                ["FS"] = PredictHits(mapdata, bpm, mode, difficulty, 1.2),
+                ["SF"] = PredictHits(mapdata, bpm, mode, difficulty, 1.5),
             };
         }
 
@@ -366,16 +364,16 @@ namespace RatingAPI.Controllers
 
             return new Dictionary<string, object>
             {
-                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, data._noteJumpMovementSpeed, scale)
+                ["notes"] = ai.PredictHitsForMapNotes(CustomModeDataMapping(mode, map.Data), mapset.Info._beatsPerMinute, scale)
             };
         }
 
-        public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double njs, double timescale)
+        public RatingResult GetBLRatings(DifficultySet map, string characteristic, string difficulty, double bpm, double timescale, double njsMult = 1)
         {
             var mapdata = CustomModeDataMapping(characteristic, map.Data);
-            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)njs, (float)timescale).FirstOrDefault();
+            var ratings = analyzer.GetRating(mapdata, characteristic, difficulty, (float)bpm, (float)timescale, (float)njsMult).FirstOrDefault();
             if (ratings == null) return new();
-            var predictedAcc = ai.GetAIAcc(mapdata, bpm, njs, timescale);
+            var predictedAcc = ai.GetAIAcc(mapdata, bpm, timescale, njsMult);
             var lack = new LackMapCalculation
             {
                 PassRating = ratings.Pass,
@@ -387,7 +385,6 @@ namespace RatingAPI.Controllers
             AccRating ar = new();
             var accRating = ar.GetRating(predictedAcc, ratings.Pass, ratings.Tech);
             accRating *= ratings.Nerf;
-            lack = ModifyRatings(lack, njs * timescale, timescale);
             Curve curve = new();
             var pointList = curve.GetCurve(predictedAcc, accRating, lack);
             var star = curve.ToStars(0.96, accRating, lack, pointList);
@@ -400,23 +397,6 @@ namespace RatingAPI.Controllers
                 StarRating = star
             };
             return result;
-        }
-
-        //NJS buff for >24 njs
-        public LackMapCalculation ModifyRatings(LackMapCalculation ratings, double njs, double timescale)
-        {
-            {
-                double buff = 1f;
-                if (njs > 24)
-                {
-                    buff = 1 + 0.01 * (njs - 24);
-                }
-
-                ratings.PassRating *= buff;
-                ratings.TechRating *= buff;
-            }
-
-            return ratings;
         }
     }
 }
