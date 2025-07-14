@@ -349,6 +349,31 @@ namespace RatingAPI.Controllers
             };
         }
 
+        [HttpGet("~/ppai2/graph/link/{mode}/{diff}/full")]
+        public ActionResult<Dictionary<string, object>?> GetGraph(string hash, string mode, int diff, [FromQuery] string link)
+        {
+            var difficulty = FormattingUtils.GetDiffLabel(diff);
+            var mapset = parser.TryDownloadLink(link).FirstOrDefault();
+            if (mapset == null) return null;
+            var beatmapSets = mapset.Info._difficultyBeatmapSets.FirstOrDefault();
+            if (beatmapSets == null) return null;
+            var data = beatmapSets._difficultyBeatmaps.FirstOrDefault();
+            if (data == null) return null;
+            var map = mapset.Difficulties.FirstOrDefault(d => d.Characteristic == CustomModeMapping(mode) && d.Difficulty == difficulty);
+            if (map == null) return null;
+
+            var mapdata = CustomModeDataMapping(mode, map.Data);
+            var bpm = mapset.Info._beatsPerMinute;
+
+            return new Dictionary<string, object>
+            {
+                ["SS"] = PredictHits(mapdata, bpm, mode, difficulty, 0.85),
+                ["base"] = PredictHits(mapdata, bpm, mode, difficulty, 1.0),
+                ["FS"] = PredictHits(mapdata, bpm, mode, difficulty, 1.2),
+                ["SF"] = PredictHits(mapdata, bpm, mode, difficulty, 1.5),
+            };
+        }
+
         [HttpGet("~/json/link/{mode}/{diff}/full/time-scale/{scale}")]
         public ActionResult<Dictionary<string, object>?> GetByLink(string mode, int diff, double scale, [FromQuery] string link)
         {
