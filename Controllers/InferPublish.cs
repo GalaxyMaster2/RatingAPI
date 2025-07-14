@@ -5,6 +5,19 @@ using Parser.Map.Difficulty.V3.Base;
 
 namespace RatingAPI.Controllers
 {
+    public class PredictedNote
+    {
+        public float Time { get; set; }
+        public float Acc { get; set; }
+        public float Pass { get; set; }
+        public float Tech { get; set; }
+    }
+    public class PredictionResult
+    {
+        public float AIAcc { get; set; }
+        public PredictedNote[] Notes { get; set; }
+    }
+
     public class InferPublish
     {
         private const int BatchSize = 4;
@@ -14,6 +27,7 @@ namespace RatingAPI.Controllers
         private DataProcessing dataProcessing = new DataProcessing();
 
         private static object inferenceSessionLock = new();
+        private static InferenceSession inferenceSessionAccNew = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_bl.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
         private static InferenceSession inferenceSessionAcc = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_acc.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
         private static InferenceSession inferenceSessionSpeed = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "model_sleep_4LSTM_speed.onnx"), new Microsoft.ML.OnnxRuntime.SessionOptions { IntraOpNumThreads = NumThreads, ExecutionMode = ExecutionMode.ORT_SEQUENTIAL });
         private static InferenceSession tagSession = new InferenceSession(Path.Combine(AppContext.BaseDirectory, "tagging_model.onnx"));
@@ -42,6 +56,21 @@ namespace RatingAPI.Controllers
             return totalScore;
         }
 
+        public void SetMapAccForHits(PredictedNote[] hits)
+        {
+            float maxScore = 0;
+            float totalScore = 0;
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                float multiplier = GetMultiplierForCombo(i + 1);
+                totalScore += (hits[i].Acc * 15 + 100) * multiplier;
+                maxScore += 115 * multiplier;
+
+                hits[i].Acc = totalScore / maxScore;
+            }
+        }
+
         public double GetMapAccForHits(List<float> hits, int freePoints)
         {
             float maxScore = 0;
@@ -62,7 +91,7 @@ namespace RatingAPI.Controllers
             return totalScore / maxScore;
         }
 
-        public List<float[]> Predict(List<double[]>[] input, bool speed = false)
+        public List<float[]> Predict(List<double[]>[] input)
         {
             float[] flatInput = input.SelectMany(v => v.SelectMany(v => v.Select(v => (float)v))).ToArray();
             var modelInput = new List<NamedOnnxValue>
@@ -74,7 +103,7 @@ namespace RatingAPI.Controllers
 
             lock (inferenceSessionLock)
             {
-                using (var output = (speed ? inferenceSessionSpeed : inferenceSessionAcc).Run(modelInput, new[] { "time_distributed_2" }))
+                using (var output = (inferenceSessionAccNew).Run(modelInput, new[] { "time_distributed_2" }))
                 {
                     var flatOutput = (output.First().Value as IEnumerable<float>).ToArray();
                     System.Buffer.BlockCopy(flatOutput, 0, outputs, 0, outputs.Length * sizeof(float));
@@ -94,9 +123,9 @@ namespace RatingAPI.Controllers
             return listOutputs;
         }
 
-        public (List<float>, List<double>, int) PredictHitsForMap(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1)
+        public (List<float>, List<double>, int) PredictHitsForMap(DifficultyV3 mapdata, double bpm, double timescale = 1, double njsMult = 1)
         {
-            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(mapdata, bpm, njs, timescale);
+            var (segments, noteTimes, freePoints) = dataProcessing.PreprocessMap(mapdata, bpm, timescale, njsMult);
             if (segments.Count == 0)
             {
                 return (new List<float>(), new List<double>(), freePoints);
@@ -139,11 +168,25 @@ namespace RatingAPI.Controllers
             return (accs, noteTimes, freePoints);
         }
 
-        public Dictionary<string, object>? PredictHitsForMapNotes(DifficultyV3 mapdata, double bpm, double njs, double timescale = 1, double? fixedTimeDistance = null, double? fixedNjs = null)
+        public PredictionResult? PredictHitsForMapAllNotes(DifficultyV3 mapdata, double bpm, double timescale = 1)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, njs, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, timescale);
             double AIacc = GetMapAccForHits(accs, freePoints);
-            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
+            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, ((noteTimes.Last() - noteTimes.First() + 4) / timescale) + 2);
+            AIacc = adjustedAIacc;
+
+            return new PredictionResult
+            {
+                Notes = accs.Select((acc, index) => new PredictedNote { Acc = acc, Time = (float)noteTimes[index] }).ToArray(),
+                AIAcc = (float)AIacc,
+            };
+        }
+
+        public Dictionary<string, object>? PredictHitsForMapNotes(DifficultyV3 mapdata, double bpm, double timescale = 1)
+        {
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, timescale);
+            double AIacc = GetMapAccForHits(accs, freePoints);
+            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, ((noteTimes.Last() - noteTimes.First() + 4) / timescale) + 2);
             AIacc = adjustedAIacc;
 
             var rows = accs.Select((acc, index) => new List<double> { acc, noteTimes[index] });
@@ -475,17 +518,18 @@ namespace RatingAPI.Controllers
             return GetAccForMultiplierScale(multiplier);
         }
 
-        public double GetAIAcc(DifficultyV3 mapdata, double bpm, double njs, double timescale)
+        public double GetAIAcc(DifficultyV3 mapdata, double bpm, double timescale, double njsMult = 1)
         {
-            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, njs, timescale);
+            var (accs, noteTimes, freePoints) = PredictHitsForMap(mapdata, bpm, timescale, njsMult);
             double AIacc = GetMapAccForHits(accs, freePoints);
-            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, (noteTimes.Last() - noteTimes.First()) + 15);
+            double adjustedAIacc = ScaleFarmability(AIacc, accs.Count, ((noteTimes.Last() - noteTimes.First() + 4) / timescale) + 2);
             AIacc = adjustedAIacc;
             return AIacc;
         }
 
         // https://deepnote.com/workspace/beatleader-d4376e93-8e9f-461e-9143-e88974e31843/project/BeatLeader-38f67242-d369-4190-9d39-6f957aa93130/notebook/Map%20Categories-9defcb89bd864ca9ac11a55b0f7f9298
-        public string Tag(float acc, float tech, float pass) {
+        public string Tag(float acc, float tech, float pass)
+        {
 
             var input = new DenseTensor<float>(new float[] { acc, tech, pass }, new int[] { 1, 3 });
 
